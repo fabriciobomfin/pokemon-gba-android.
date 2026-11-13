@@ -94,6 +94,45 @@ public class MainActivity extends Activity {
         return "application/octet-stream";
     }
     public class Bridge {
+        @JavascriptInterface public String library() {
+            JSONObject games = new JSONObject();
+            for (java.util.Map.Entry<String,?> entry : getPreferences(MODE_PRIVATE).getAll().entrySet())
+                if (entry.getKey().startsWith("title.")) try {
+                    games.put(entry.getKey().substring(6), entry.getValue());
+                } catch (Exception ignored) {}
+            try {
+                JSONObject active = new JSONObject(info());
+                if (active.getBoolean("available")) games.put(active.getString("id"), active.getString("name"));
+            } catch (Exception ignored) {}
+            return games.toString();
+        }
+        @JavascriptInterface public void select(String id) {
+            runOnUiThread(() -> {
+                if (id.equals(getPreferences(MODE_PRIVATE).getString("romId",""))) { play(); return; }
+                if (id.matches("[a-f0-9]{64}")) {
+                    File file = new File(getFilesDir(), id + ".gba");
+                    if (file.exists()) importRom(Uri.fromFile(file));
+                }
+            });
+        }
+        @JavascriptInterface public void orientation(int value) {
+            runOnUiThread(() -> setRequestedOrientation(value == 1 ? 1 : value == 2 ? 0 : -1));
+        }
+        @JavascriptInterface public void immersive(boolean value) {
+            runOnUiThread(() -> getWindow().getDecorView().setSystemUiVisibility(value ? 5894 : 0));
+        }
+        @JavascriptInterface public void pulse() {
+            runOnUiThread(() -> web.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY));
+        }
+        @JavascriptInterface public void backup(boolean export) {
+            runOnUiThread(() -> {
+                Intent intent = new Intent(export ? Intent.ACTION_CREATE_DOCUMENT : Intent.ACTION_OPEN_DOCUMENT);
+                intent.addCategory(Intent.CATEGORY_OPENABLE);
+                intent.setType(export ? "application/json" : "*/*");
+                if (export) intent.putExtra(Intent.EXTRA_TITLE,"Lume-" + getPreferences(MODE_PRIVATE).getString("romId","game").substring(0,4) + ".json");
+                startActivityForResult(intent, export ? 13 : 14);
+            });
+        }
         @JavascriptInterface public void pick() {
             runOnUiThread(() -> {
                 if (importing) return;
@@ -115,7 +154,7 @@ public class MainActivity extends Activity {
         @JavascriptInterface public void play() {
             runOnUiThread(() -> { if (!importing && new File(getFilesDir(), "game.gba").isFile()) web.loadUrl(PLAY); });
         }
-        @JavascriptInterface public void home() { runOnUiThread(() -> web.loadUrl(HOME)); }
+        @JavascriptInterface public void home() { runOnUiThread(() -> { orientation(0); immersive(false); web.loadUrl(HOME); }); }
         @JavascriptInterface public boolean saveFiles(String json) {
             try {
                 if (json.length() > 8 * 1024 * 1024) return false;
@@ -167,7 +206,59 @@ public class MainActivity extends Activity {
 
     @Override protected void onActivityResult(int request, int result, Intent data) {
         super.onActivityResult(request, result, data);
+        if ((request == 13 || request == 14) && result == RESULT_OK && data != null && data.getData() != null) {
+            Uri uri = data.getData();
+            imports.execute(() -> {
+                try {
+                    Bridge bridge = new Bridge();
+                    String id = getPreferences(MODE_PRIVATE).getString("romId","game");
+                    if (request == 13) {
+                        JSONObject files = new JSONObject(bridge.loadFiles());
+                        if (files.length() == 0) throw new IOException("Salve pelo menu do jogo antes de exportar.");
+                        String json = new JSONObject().put("rom",id).put("saves",files).toString();
+                        try (OutputStream out = getContentResolver().openOutputStream(uri,"wt")) {
+                            out.write(json.getBytes("UTF-8"));
+                        }
+                    } else {
+                        ByteArrayOutputStream out = new ByteArrayOutputStream();
+                        try (InputStream input = getContentResolver().openInputStream(uri)) {
+                            byte[] chunk = new byte[8192]; int n;
+                            while ((n=input.read(chunk)) != -1) {
+                                if (out.size()+n > 8388608) throw new IOException("Backup muito grande.");
+                                out.write(chunk,0,n);
+                            }
+                        }
+                        JSONObject backup = new JSONObject(out.toString("UTF-8"));
+                        if (!id.equals(backup.getString("rom"))) throw new IOException("O backup pertence a outra ROM.");
+                        JSONObject files = backup.getJSONObject("saves");
+                        if (files.length()==0 || !bridge.saveFiles(files.toString())) throw new IOException("Backup inválido.");
+                    }
+                    notifyUser(request == 13 ? "Backup exportado" : "Progresso restaurado");
+                } catch (Exception ex) { notifyUser("Falha no backup: " + ex.getMessage()); }
+            });
+        }
         if (request == PICK_ROM && result == RESULT_OK && data != null && data.getData() != null) importRom(data.getData());
+    }
+
+    private void notifyUser(String message) {
+        runOnUiThread(() -> Toast.makeText(this,message,Toast.LENGTH_LONG).show());
+    }
+
+    private void archiveActive() throws IOException {
+        android.content.SharedPreferences prefs = getPreferences(MODE_PRIVATE);
+        String id = prefs.getString("romId","");
+        File current = new File(getFilesDir(),"game.gba");
+        if (!id.matches("[a-f0-9]{64}") || !current.exists()) return;
+        File archive = new File(getFilesDir(),id + ".gba");
+        if (!archive.exists()) {
+            File tmp = new File(getFilesDir(),"archive.tmp");
+            try (InputStream input = new FileInputStream(current); OutputStream out = new FileOutputStream(tmp)) {
+                byte[] buffer = new byte[65536]; int n;
+                while ((n=input.read(buffer)) != -1) out.write(buffer,0,n);
+            }
+            if (!tmp.renameTo(archive)) throw new IOException("Falha ao guardar jogo anterior.");
+        }
+        prefs.edit().putString("title."+id,prefs.getString("romName","ROM GBA")).commit();
     }
 
     void importRom(Uri uri) {
@@ -179,14 +270,35 @@ public class MainActivity extends Activity {
             FileOutputStream output = null;
             try {
                 String name = "ROM GBA";
-                try (Cursor cursor = getContentResolver().query(uri, new String[]{OpenableColumns.DISPLAY_NAME}, null, null, null)) {
+                if ("file".equals(uri.getScheme())) name = getPreferences(MODE_PRIVATE).getString("title."+new File(uri.getPath()).getName().replace(".gba",""),"ROM GBA");
+                else try (Cursor cursor = getContentResolver().query(uri, new String[]{OpenableColumns.DISPLAY_NAME}, null, null, null)) {
                     if (cursor != null && cursor.moveToFirst()) name = cursor.getString(0);
                 }
                 if (name == null) name = "ROM GBA";
                 MessageDigest digest = MessageDigest.getInstance("SHA-256");
                 byte[] header = new byte[192];
                 int total = 0;
-                try (InputStream input = getContentResolver().openInputStream(uri)) {
+                archiveActive();
+                try (InputStream raw = getContentResolver().openInputStream(uri)) {
+                    InputStream input = raw;
+                    if (name.toLowerCase(java.util.Locale.ROOT).endsWith(".zip")) {
+                        java.util.zip.ZipInputStream zip = new java.util.zip.ZipInputStream(raw);
+                        java.util.zip.ZipEntry entry = zip.getNextEntry();
+                        int entries = 0, skipped = 0;
+                        byte[] skipBuffer = new byte[8192];
+                        while (entry != null && (entry.isDirectory() || !entry.getName().toLowerCase(java.util.Locale.ROOT).endsWith(".gba"))) {
+                            if (++entries > 256) throw new IOException("ZIP contém muitas entradas.");
+                            int n;
+                            while ((n=zip.read(skipBuffer)) != -1) {
+                                skipped+=n;
+                                if (skipped > 33554432) throw new IOException("ZIP muito grande.");
+                            }
+                            entry = zip.getNextEntry();
+                        }
+                        if (entry == null) throw new IOException("Nenhuma ROM .gba no ZIP.");
+                        name = new File(entry.getName()).getName();
+                        input = zip;
+                    }
                     if (input == null) throw new IOException("Não foi possível abrir o arquivo.");
                     output = target.startWrite();
                     byte[] buffer = new byte[65536];
@@ -200,7 +312,7 @@ public class MainActivity extends Activity {
                         total += count;
                     }
                 }
-                if (total < 192 || (header[0xB2] & 255) != 0x96) throw new IOException("Arquivo inválido. Selecione uma ROM .gba, sem ZIP.");
+                if (total < 192 || (header[0xB2] & 255) != 0x96) throw new IOException("Arquivo inválido. O cabeçalho GBA não foi reconhecido.");
                 target.finishWrite(output);
                 output = null;
                 StringBuilder hash = new StringBuilder();
@@ -235,3 +347,4 @@ public class MainActivity extends Activity {
         super.onDestroy();
     }
 }
+

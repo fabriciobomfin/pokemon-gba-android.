@@ -73,7 +73,9 @@ public class OfflineSmokeRunner extends Instrumentation {
             }
             require(redPixels>1000,"Expected red homebrew framebuffer, found " + redPixels + " red pixels");
             screenshot.recycle();
-            require("true".equals(js(app,"document.querySelectorAll('.ejs_virtualGamepad_button').length>=6")),"Touch controls missing");
+            require("true".equals(js(app,"document.querySelectorAll('#console button.pad').length===7 && document.querySelector('#console .action').getBoundingClientRect().width>30")),"Touch controls missing");
+            require("true".equals(js(app,"document.getElementById('settings-toggle').click(); !document.getElementById('settings-panel').hidden && !!document.getElementById('pref-volume')")), "Profile panel failed");
+            js(app,"toggleSettings(false)");
             // Exercise production native save persistence and restore before the core starts.
             js(app,"window.persistDone=false;EJS_emulator.gameManager.FS.writeFile('/data/saves/offline-test',new Uint8Array([11,22,33]));EJS_emulator.gameManager.FS.syncfs(false,()=>window.persistDone=true);true");
             waitJs(app,"window.persistDone===true");
