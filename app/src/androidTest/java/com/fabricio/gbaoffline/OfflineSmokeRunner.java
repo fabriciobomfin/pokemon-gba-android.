@@ -75,7 +75,7 @@ public class OfflineSmokeRunner extends Instrumentation {
             screenshot.recycle();
             require("true".equals(js(app,"document.querySelectorAll('.ejs_virtualGamepad_button').length>=6")),"Touch controls missing");
             // Verify IndexedDB-backed saves can be persisted and survive activity restart.
-            js(app,"window.persistDone=false;EJS_emulator.gameManager.FS.writeFile('/data/saves/offline-test',[11,22,33]);EJS_emulator.gameManager.FS.syncfs(false,()=>window.persistDone=true);true");
+            js(app,"window.persistDone=false;EJS_emulator.gameManager.FS.writeFile('/data/saves/offline-test',new Uint8Array([11,22,33]));EJS_emulator.gameManager.FS.syncfs(false,()=>window.persistDone=true);true");
             waitJs(app,"window.persistDone===true");
             // Invalid imports must not destroy an existing valid ROM.
             File bad = new File(getTargetContext().getCacheDir(),"invalid.gba");
