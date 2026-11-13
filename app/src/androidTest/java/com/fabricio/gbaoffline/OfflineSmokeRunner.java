@@ -78,6 +78,10 @@ public class OfflineSmokeRunner extends Instrumentation {
             require("true".equals(js(app,"var speedBtn=document.getElementById('speed-button'); speedBtn.click(); speedBtn.textContent==='2×' && document.getElementById('settings-panel').hidden")), "Direct speed change failed");
             require("true".equals(js(app,"document.getElementById('reopen').click(); !!document.querySelector('#reopen svg path') && document.querySelectorAll('.category summary svg path').length===5 && !document.getElementById('settings-panel').hidden && !document.querySelector('.category[open]')")), "Settings overview failed");
             require("true".equals(js(app,"document.querySelector('.category summary').click(); document.getElementById('pref-fit').offsetHeight>0 && !document.getElementById('pref-volume').offsetHeight")), "Video category failed");
+            require("true".equals(js(app,"Array.from(document.querySelectorAll('#quick button')).map(b=>b.id).join()==='save-point,load-point' && el('load-point').disabled")), "Quick menu order failed");
+            require("true".equals(js(app,"[[0,-.4,4],[0,.4,5],[-.4,0,6],[.4,0,7]].every(([x,y,d])=>directionCodes(x,y,false).join()===String(d)) && directionCodes(.32,.45,false).length===1 && directionCodes(.4,.4,true).length===2")), "Directional mapping failed");
+            js(app,"el('save-point').click()");
+            waitJs(app,"!el('load-point').disabled && el('checkpoint-status').textContent.includes('salvo')");
             js(app,"toggleSettings(false)");
             // Exercise production native save persistence and restore before the core starts.
             js(app,"window.persistDone=false;EJS_emulator.gameManager.FS.writeFile('/data/saves/offline-test',new Uint8Array([11,22,33]));EJS_emulator.gameManager.FS.syncfs(false,()=>window.persistDone=true);true");
@@ -99,6 +103,9 @@ public class OfflineSmokeRunner extends Instrumentation {
             js(app,"document.querySelector('.ejs_start_button').click();true");
             waitJs(app,"!!(window.EJS_emulator && EJS_emulator.started && EJS_emulator.gameManager && EJS_emulator.gameManager.getFrameNum()>60)");
             require("true".equals(js(app,"Array.from(EJS_emulator.gameManager.FS.readFile('/data/saves/offline-test')).join(',')==='11,22,33'")),"Save persistence failed");
+            waitJs(app,"!el('load-point').disabled");
+            js(app,"el('reopen').click();el('load-point').click()");
+            waitJs(app,"el('checkpoint-status').textContent==='Save restaurado.' && el('settings-panel').hidden");
             status.putString("stream","\nOffline ROM import, >120 emulated frames, reopen, invalid import rollback and persistent saves passed.\n");
             sendStatus(0,status);
             Bundle result=new Bundle();result.putString("stream","\nOK (1 test)\n"); finish(Activity.RESULT_OK,result);

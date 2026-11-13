@@ -1,5 +1,5 @@
 const info=JSON.parse(Android.info()),games=JSON.parse(Android.library());
-el('help').onclick=()=>{show('Como jogar');detail.append(make('p','Importe uma ROM .gba ou um ZIP e toque em Jogar. A partida abre em tela cheia. Toque em 1× para alternar a velocidade.'),make('p','Salve pelo menu do jogo. Para guardar uma cópia, abra Mais e escolha Backup do último jogo.'))};
+el('help').onclick=()=>{show('Como jogar');detail.append(make('p','Importe uma ROM .gba ou um ZIP e toque em Jogar. A partida abre em tela cheia. Toque em 1× para alternar a velocidade.'),make('p','Na engrenagem, toque em Salvar jogo. Voltar ao save recupera aquele instante. Para exportar o progresso gravado pelo menu original do cartucho, abra Mais e escolha Backup do último jogo.'))};
 el('import').onclick=()=>Android.pick();el('continue').onclick=()=>Android.play();
 el('saved').hidden=el('tools').hidden=el('progress').hidden=!info.available;
 el('exp').onclick=()=>Android.backup(true);
@@ -22,9 +22,6 @@ function render(){
  if(!rows.length)el('list').append(make('p',ids.length?'Nenhum jogo corresponde ao filtro.':'Sua biblioteca começa com a primeira ROM.'))
 }
 el('sort').value=read('shelfSort','recent');el('sort').onchange=()=>{write('shelfSort',el('sort').value);render()};el('search').oninput=el('fav').onchange=render;render();
-let urls=[];dialog.onclose=()=>{urls.forEach(URL.revokeObjectURL);urls=[]};
-el('shots').onclick=async()=>{show('Galeria local');const gallery=make('div');gallery.id='gallery';detail.append(gallery);try{const shots=await photos('readonly',store=>store.getAll());if(!shots.length)gallery.append(make('p','As capturas feitas durante o jogo aparecem aqui.'));for(const shot of shots.reverse()){const fig=make('figure'),img=make('img');img.src=URL.createObjectURL(shot.blob);urls.push(img.src);img.alt=shot.name;fig.append(img,make('figcaption',shot.name+' · '+new Date(shot.time).toLocaleString('pt-BR')),action('Excluir captura',async()=>{if(confirm('Excluir esta captura?')){await photos('readwrite',s=>s.delete(shot.time));fig.remove()}}));gallery.append(fig)}}catch{gallery.textContent='Falha ao abrir as capturas.'}};
-
-for(const [selector,icon] of [['.shelf h1','library'],['#help','guide'],['#shots','gallery'],['#progress summary','backup'],['#tools summary','search'],['.utility a','document']]){
+for(const [selector,icon] of [['.shelf h1','library'],['#help','guide'],['#progress summary','backup'],['#tools summary','search'],['.utility a','document']]){
  document.querySelector(selector).prepend(sectionIcon(icon));
 }

@@ -12,11 +12,61 @@ function setting(key,label,choices,type='select'){
  field.oninput=()=>{settings[key]=type==='checkbox'?field.checked:type==='range'?+field.value:field.value;persist();apply()};lab.append(field);row.append(lab);panel.append(row)
 }
 const quick=make('div');quick.id='quick';panel.querySelector('.panel-head').after(quick);
-function gameAction(label,fn){quick.append(action(label,async()=>{const e=emulator();if(!e?.started){say('Inicie o jogo primeiro');return}try{await fn(e)}catch{say('Não foi possível concluir a ação')}}))}
-gameAction('Pausar / continuar',e=>{e.paused?e.play():e.pause();say(e.paused?'Pausado':'Jogando');toggleSettings(false)});
-gameAction('Capturar tela',async e=>{const blob=new Blob([await e.gameManager.screenshot()],{type:'image/png'});await photos('readwrite',s=>s.put({time:Date.now(),name:rom.name,blob}));say('Captura na galeria local')});
-gameAction('Reiniciar',e=>{if(confirm('Reiniciar o jogo agora?')){saveGame(false);e.gameManager.restart();toggleSettings(false)}});
-quick.append(action('Biblioteca',()=>leaveGame()),action('Mover controles',()=>{settings.show=true;const box=el('show-controls');if(!box.checked)box.click();editing=true;document.body.classList.add('editing');toggleSettings(false);editDone.hidden=false;say('Arraste os controles e toque em Concluir')}));
+// One transactional checkpoint per ROM, in the app's private WebView storage.
+const checkpoints=new Promise((resolve,reject)=>{
+ const request=indexedDB.open('fire-game-checkpoints',1);
+ request.onupgradeneeded=()=>request.result.createObjectStore('games');
+ request.onsuccess=()=>resolve(request.result);
+ request.onerror=()=>reject(request.error);
+});
+async function checkpoint(bytes){
+ const db=await checkpoints;
+ return new Promise((resolve,reject)=>{
+  const tx=db.transaction('games',bytes?'readwrite':'readonly');
+  const games=tx.objectStore('games');
+  const request=bytes?games.put({bytes,time:Date.now()},rom.id):games.get(rom.id);
+  tx.oncomplete=()=>resolve(request.result);
+  tx.onabort=()=>reject(tx.error);
+ });
+}
+const saveButton=action('Salvar jogo',()=>useCheckpoint(true));
+const loadButton=action('Voltar ao save',()=>useCheckpoint(false));
+saveButton.id='save-point';loadButton.id='load-point';
+saveButton.prepend(sectionIcon('backup'));loadButton.prepend(sectionIcon('restore'));
+const feedback=make('small');feedback.id='checkpoint-status';feedback.setAttribute('role','status');
+quick.append(saveButton,loadButton,feedback);
+let hasCheckpoint=false,checkpointBusy=false;
+function refreshCheckpoint(){
+ saveButton.disabled=checkpointBusy||!emulator()?.started;
+ loadButton.disabled=saveButton.disabled||!hasCheckpoint;
+}
+async function useCheckpoint(saving){
+ const e=emulator();
+ if(checkpointBusy||!e?.started)return;
+ checkpointBusy=true;refreshCheckpoint();
+ try{
+  if(saving){
+   const bytes=e.gameManager.getState();
+   if(!bytes?.byteLength)throw Error();
+   await checkpoint(bytes);hasCheckpoint=true;
+   feedback.textContent='Jogo salvo neste aparelho.';
+  }else{
+   const point=await checkpoint();
+   if(!point?.bytes?.byteLength)throw Error();
+   e.gameManager.loadState(point.bytes);
+   feedback.textContent='Save restaurado.';toggleSettings(false);
+  }
+ }catch{feedback.textContent=saving?'Falha ao salvar. Tente novamente.':'Falha ao carregar o save.'}
+ finally{checkpointBusy=false;refreshCheckpoint()}
+}
+refreshCheckpoint();
+checkpoint().then(point=>{
+ hasCheckpoint=!!point;feedback.textContent=point?'Último save · '+new Date(point.time).toLocaleString('pt-BR'):'Nenhum ponto salvo para este jogo.';
+ refreshCheckpoint();
+}).catch(()=>{feedback.textContent='Armazenamento de saves indisponível.'});
+const restart=action('Reiniciar',()=>{const e=emulator();if(e?.started&&confirm('Reiniciar o jogo agora?')){saveGame(false);e.gameManager.restart();toggleSettings(false)}});
+const library=action('Biblioteca',()=>leaveGame());
+const move=action('Mover controles',()=>{const box=el('show-controls');if(!box.checked)box.click();editing=true;document.body.classList.add('editing');toggleSettings(false);editDone.hidden=false;say('Arraste os controles e toque em Concluir')});
 const editDone=action('Concluir',()=>{editing=false;document.body.classList.remove('editing');editDone.hidden=true;persist();say('Posições salvas')});editDone.style.cssText='position:absolute;z-index:23;top:2px;left:42%';editDone.hidden=true;document.body.append(editDone);
 const choices=(...items)=>items.map(item=>item.split('|'));
 setting('preset','Posição dos botões',choices('classic|Clássica','left|Canhoto','compact|Compacta'));
@@ -28,11 +78,11 @@ setting('brightness','Brilho da imagem',[50,150,5],'range');setting('saturation'
 setting('volume','Volume',[0,100,5],'range');
 setting('interval','Intervalo de gravação',choices('5|5 segundos','15|15 segundos','30|30 segundos'));
 for(const [key,label] of Object.entries({mute:'Silenciar áudio',focus:'Tela cheia',haptic:'Vibração dos botões',contrast:'Alto contraste',bigtext:'Texto ampliado no menu',clock:'Relógio no cabeçalho',timer:'Tempo da sessão',swap:'Trocar A e B',diagonal:'Permitir diagonais no direcional'})){
- if(key==='diagonal'&&settings[key]===undefined)settings[key]=true;setting(key,label,[],'checkbox')
+ if(key==='diagonal'&&settings[key]===undefined)settings[key]=false;setting(key,label,[],'checkbox')
 }
 const clock=make('span');clock.id='timer';el('app-header').querySelector('.brand-line').append(clock);
 el('reopen').onclick=()=>toggleSettings(true);
-quick.append(action('Restaurar posições',()=>{settings.positions={};persist();place()}));
+const reset=action('Restaurar posições',()=>{settings.positions={};persist();place()});
 function addCategory(title, icon, fields, actions=[]) {
  const group=make('details');group.className='category';
  const summary=make('summary',title);summary.prepend(sectionIcon(icon));group.append(summary);panel.append(group);
@@ -40,8 +90,7 @@ function addCategory(title, icon, fields, actions=[]) {
  for(const button of actions)group.append(button);
  group.addEventListener('toggle',()=>{if(group.open)for(const other of panel.querySelectorAll('.category'))if(other!==group)other.open=false});
 }
-const [pause,capture,restart,library,move,reset]=Array.from(quick.children);
-quick.replaceChildren(pause,library);
+
 library.prepend(sectionIcon('library'));
 for(const id of ['reopen','settings-toggle']){
  const button=el(id);button.replaceChildren(sectionIcon('gear'));
@@ -52,7 +101,7 @@ addCategory('Vídeo','screen',['pref-focus','pref-orientation','pref-fit','pref-
 addCategory('Áudio','sound',['pref-volume','pref-mute']);
 addCategory('Controles','controller',['pref-preset','control-size','control-opacity','show-controls','pref-haptic','pref-swap','pref-diagonal'],[move,reset]);
 addCategory('Aparência e acessibilidade','palette',['pref-theme','pref-contrast','pref-bigtext']);
-addCategory('Avançado','sliders',['pref-interval','pref-clock','pref-timer'],[action('Gravar progresso',()=>saveGame(true)),capture,restart]);
+addCategory('Avançado','sliders',['pref-interval','pref-clock','pref-timer'],[library,restart]);
 const speedButton=el('speed-button');
 function updateSpeed(){
  const host=settings.focus?document.body:document.querySelector('.toolbar');
@@ -77,18 +126,32 @@ function place(){
  b.style.left=limit(x,b.offsetWidth*scale,rect.width)+'%';b.style.top=limit(y,b.offsetHeight*scale,rect.height)+'%';
  })
 }
-for(const id of ids){const b=make('button',id==='D'?'✦':id);b.className='pad '+(id==='D'?'cross':id==='A'||id==='B'?'action':'slim');b.setAttribute('aria-label',id==='D'?'Direcional':id);deck.append(b);buttons[id]=b;
+function directionCodes(x,y,diagonal){
+ const ax=Math.abs(x),ay=Math.abs(y);
+ if(Math.max(ax,ay)<.07)return [];
+ const horizontal=x<0?6:7,vertical=y<0?4:5;
+ if(diagonal&&Math.min(ax,ay)>.63*Math.max(ax,ay))return [horizontal,vertical];
+ return ax>ay?[horizontal]:[vertical];
+}
+for(const id of ids){const b=make('button',id==='D'?'':id);b.className='pad '+(id==='D'?'cross':id==='A'||id==='B'?'action':'slim');b.setAttribute('aria-label',id==='D'?'Direcional':id);deck.append(b);buttons[id]=b;
+ if(id==='D'){
+  for(const [code,arrow] of [[4,'▴'],[5,'▾'],[6,'◂'],[7,'▸']]){
+   const mark=make('span',arrow);mark.dataset.code=code;mark.setAttribute('aria-hidden','true');b.append(mark);
+  }
+ }
  function update(event){
  if(editing){const r=deck.getBoundingClientRect(),group=settings.positions[keyLayout()]||(settings.positions[keyLayout()]={});group[id]=[100*(event.clientX-r.left)/r.width,100*(event.clientY-r.top)/r.height];place();return}
  if(!emulator()?.started)return;
  if(id!=='D'){inputs(event.pointerId,[codes[settings.swap&&id==='A'?'B':settings.swap&&id==='B'?'A':id]]);return}
  const r=b.getBoundingClientRect(),x=(event.clientX-r.left)/r.width-.5,y=(event.clientY-r.top)/r.height-.5;
- const horizontal=Math.abs(x)>.10&&(settings.diagonal||Math.abs(x)>Math.abs(y)),vertical=Math.abs(y)>.10&&(settings.diagonal||!horizontal);
- inputs(event.pointerId,[...(horizontal?[x<0?6:7]:[]),...(vertical?[y<0?4:5]:[])])
+ const directions=directionCodes(x,y,settings.diagonal);
+ inputs(event.pointerId,directions);
+ for(const mark of b.children)mark.classList.toggle('lit',directions.includes(+mark.dataset.code));
+
  }
  b.onpointerdown=e=>{e.preventDefault();b.setPointerCapture(e.pointerId);b.classList.add('pressed');if(settings.haptic)Android.pulse();update(e)};
  b.onpointermove=e=>{if(b.hasPointerCapture(e.pointerId))update(e)};
- b.onlostpointercapture=e=>{inputs(e.pointerId,[]);b.classList.remove('pressed');if(editing)persist()}
+ b.onlostpointercapture=e=>{inputs(e.pointerId,[]);b.classList.remove('pressed');for(const mark of b.children)mark.classList.remove('lit');if(editing)persist()}
 }
 function apply(){
  const palettes={ameixa:['#120f1e','#251d37','#ffb65e'],brasa:['#221015','#382026','#ff996a'],jade:['#0c2021','#153638','#8fe2c3'],noite:['#080d19','#1a2438','#a9caff']};
@@ -102,7 +165,7 @@ function apply(){
 }
 el('sharp-image').addEventListener('change',apply);el('control-size').addEventListener('input',place);
 new ResizeObserver(place).observe(deck);apply();
-window.EJS_onGameStart=()=>{updateMeta(rom.id,{last:Date.now(),sessions:(gameMeta(rom.id).sessions||0)+1});apply();say('Jogando offline');setInterval(()=>{
+window.EJS_onGameStart=()=>{refreshCheckpoint();updateMeta(rom.id,{last:Date.now(),sessions:(gameMeta(rom.id).sessions||0)+1});apply();say('Jogando offline');setInterval(()=>{
  const e=emulator();if(document.hidden||!e?.started||e.paused)return;activeSeconds++;updateMeta(rom.id,{seconds:(gameMeta(rom.id).seconds||0)+1});if(activeSeconds%Number(settings.interval)===0)saveGame(false);
  clock.textContent=[settings.clock?new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'',settings.timer?Math.floor(activeSeconds/60)+'m '+activeSeconds%60+'s':''].filter(Boolean).join(' · ')
  },1000)};
