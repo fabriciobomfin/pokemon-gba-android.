@@ -8,8 +8,6 @@ import android.webkit.WebViewClient;
 import android.webkit.WebSettings;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
-import android.webkit.WebViewAssetLoader;
-import androidx.annotation.Nullable;
 import java.io.*;
 public class MainActivity extends Activity {
   private static final int PICK_ROM=12;
@@ -31,6 +29,6 @@ public class MainActivity extends Activity {
     web.loadUrl("https://appassets.androidplatform.net/assets/index.html");
   }
   private String mime(String p){if(p.endsWith(".js"))return "text/javascript";if(p.endsWith(".css"))return "text/css";if(p.endsWith(".wasm"))return "application/wasm";if(p.endsWith(".html"))return "text/html";return "application/octet-stream";}
-  @Override protected void onActivityResult(int req,int result,@Nullable Intent data){super.onActivityResult(req,result,data);if(req==PICK_ROM&&result==RESULT_OK&&data!=null){try(InputStream in=getContentResolver().openInputStream(data.getData());OutputStream out=openFileOutput("game.gba",MODE_PRIVATE)){byte[] b=new byte[8192];int n;while((n=in.read(b))!=-1)out.write(b,0,n);web.loadUrl("https://appassets.androidplatform.net/assets/play.html");}catch(Exception e){android.widget.Toast.makeText(this,"Erro ao importar ROM",0).show();}}}
+  @Override protected void onActivityResult(int req,int result,Intent data){super.onActivityResult(req,result,data);if(req==PICK_ROM&&result==RESULT_OK&&data!=null){try(InputStream in=getContentResolver().openInputStream(data.getData());OutputStream out=openFileOutput("game.gba",MODE_PRIVATE)){byte[] b=new byte[8192];int n;while((n=in.read(b))!=-1)out.write(b,0,n);web.loadUrl("https://appassets.androidplatform.net/assets/play.html");}catch(Exception e){android.widget.Toast.makeText(this,"Erro ao importar ROM",0).show();}}}
   @Override public void onBackPressed(){if(web.canGoBack())web.goBack();else super.onBackPressed();}
 }
