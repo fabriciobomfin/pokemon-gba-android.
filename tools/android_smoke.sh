@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -uo pipefail
+mkdir -p app/build/reports/device
+adb shell svc wifi disable
+adb shell svc data disable
+gradle assembleDebugAndroidTest --no-daemon --stacktrace || exit 1
+adb install -r app/build/outputs/apk/debug/app-debug.apk || exit 1
+adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk || exit 1
+test_result=0
+adb shell am instrument -w -r com.fabricio.gbaoffline.test/com.fabricio.gbaoffline.OfflineSmokeRunner | tee app/build/reports/device/instrumentation.txt
+if ! grep -Fq 'OK (1 test)' app/build/reports/device/instrumentation.txt; then test_result=1; fi
+adb exec-out run-as com.fabricio.gbaoffline cat cache/smoke.png > app/build/reports/device/framebuffer.png || true
+adb logcat -d > app/build/reports/device/logcat.txt || true
+exit "$test_result"
