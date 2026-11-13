@@ -130,7 +130,7 @@ public class MainActivity extends Activity {
                 Intent intent = new Intent(export ? Intent.ACTION_CREATE_DOCUMENT : Intent.ACTION_OPEN_DOCUMENT);
                 intent.addCategory(Intent.CATEGORY_OPENABLE);
                 intent.setType(export ? "application/json" : "*/*");
-                if (export) intent.putExtra(Intent.EXTRA_TITLE,"Lume-" + getPreferences(MODE_PRIVATE).getString("romId","game").substring(0,4) + ".json");
+                if (export) intent.putExtra(Intent.EXTRA_TITLE,"Fire-Game-" + getPreferences(MODE_PRIVATE).getString("romId","game").substring(0,4) + ".json");
                 startActivityForResult(intent, export ? 13 : 14);
             });
         }

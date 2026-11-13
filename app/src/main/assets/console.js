@@ -1,5 +1,5 @@
 const deck=el('console'),panel=el('settings-panel'),profileKey='pocket:'+rom.id;
-const defaults={theme:'ameixa',orientation:'auto',preset:'classic',volume:75,filter:'original',brightness:100,saturation:100,fit:'contain',speed:'1',interval:5,positions:{},haptic:true};
+const defaults={focus:true,theme:'ameixa',orientation:'auto',preset:'classic',volume:75,filter:'original',brightness:100,saturation:100,fit:'contain',speed:'1',interval:5,positions:{},haptic:true};
 let settings=Object.assign({},defaults,read(profileKey,{})),editing=false,activeSeconds=0;
 const emulator=()=>window.EJS_emulator;
 const say=text=>{el('status').textContent=text};
@@ -26,7 +26,6 @@ setting('fit','Enquadramento',choices('contain|Proporção original','cover|Pree
 setting('filter','Imagem',choices('original|Original','lcd|LCD','crt|CRT','mono|Monocromática','warm|Quente'));
 setting('brightness','Brilho da imagem',[50,150,5],'range');setting('saturation','Intensidade das cores',[0,170,5],'range');
 setting('volume','Volume',[0,100,5],'range');
-setting('speed','Velocidade',choices('1|Normal','2|2×','3|3×'));
 setting('interval','Intervalo de gravação',choices('5|5 segundos','15|15 segundos','30|30 segundos'));
 for(const [key,label] of Object.entries({mute:'Silenciar áudio',focus:'Tela cheia',haptic:'Vibração dos botões',contrast:'Alto contraste',bigtext:'Texto ampliado no menu',clock:'Relógio no cabeçalho',timer:'Tempo da sessão',swap:'Trocar A e B',diagonal:'Permitir diagonais no direcional'})){
  if(key==='diagonal'&&settings[key]===undefined)settings[key]=true;setting(key,label,[],'checkbox')
@@ -34,6 +33,31 @@ for(const [key,label] of Object.entries({mute:'Silenciar áudio',focus:'Tela che
 const clock=make('span');clock.id='timer';el('app-header').querySelector('.brand-line').append(clock);
 el('reopen').onclick=()=>toggleSettings(true);
 quick.append(action('Restaurar posições',()=>{settings.positions={};persist();place()}));
+function addCategory(title, fields, actions=[]) {
+ const group=make('details');group.className='category';
+ group.append(make('summary',title));panel.append(group);
+ for(const field of fields)group.append(el(field).closest('.setting'));
+ for(const button of actions)group.append(button);
+ group.addEventListener('toggle',()=>{if(group.open)for(const other of panel.querySelectorAll('.category'))if(other!==group)other.open=false});
+}
+const [pause,capture,restart,library,move,reset]=Array.from(quick.children);
+quick.replaceChildren(pause,library);
+addCategory('Vídeo',['pref-focus','pref-orientation','pref-fit','pref-filter','sharp-image','pref-brightness','pref-saturation']);
+addCategory('Áudio',['pref-volume','pref-mute']);
+addCategory('Controles',['pref-preset','control-size','control-opacity','show-controls','pref-haptic','pref-swap','pref-diagonal'],[move,reset]);
+addCategory('Aparência e acessibilidade',['pref-theme','pref-contrast','pref-bigtext']);
+addCategory('Avançado',['pref-interval','pref-clock','pref-timer'],[action('Gravar progresso',()=>saveGame(true)),capture,restart]);
+const speedButton=el('speed-button');
+function updateSpeed(){
+ const host=settings.focus?document.body:document.querySelector('.toolbar');
+ if(speedButton.parentElement!==host)host.prepend(speedButton);
+ const speed=Number(settings.speed);
+ speedButton.textContent=speed+'×';
+ speedButton.setAttribute('aria-label','Velocidade '+speed+'×. Toque para mudar.');
+ const e=emulator();
+ if(e?.started){e.gameManager.setFastForwardRatio(speed);e.gameManager.toggleFastForward(speed>1?1:0)}
+}
+speedButton.onclick=()=>{settings.speed=String(Number(settings.speed)%3+1);persist();updateSpeed()};
 const ids=['D','A','B','L','R','Select','Start'],codes={A:8,B:0,L:10,R:11,Select:2,Start:3};
 const landscape=matchMedia('(orientation: landscape)');
 const buttons={},held=new Map(),visits=new Map();
@@ -66,7 +90,8 @@ function apply(){
  for(const key of ['focus','contrast','bigtext'])document.body.classList.toggle(key,!!settings[key]);document.body.classList.toggle('scan',['lcd','crt'].includes(settings.filter));
  const canvas=emulator()?.canvas;if(canvas){canvas.style.setProperty('object-fit',settings.fit,'important');canvas.style.setProperty('image-rendering',el('sharp-image').checked?'pixelated':'auto','important');canvas.style.filter='brightness('+settings.brightness+'%) saturate('+settings.saturation+'%) '+({mono:'grayscale(1)',warm:'sepia(.35)',lcd:'contrast(.9)',crt:'contrast(1.18)'}[settings.filter]||'')}
  Android.orientation(settings.orientation==='vertical'?1:settings.orientation==='horizontal'?2:0);Android.immersive(!!settings.focus);
- const e=emulator();if(e?.started){e.volume=settings.mute?0:settings.volume/100;e.setVolume(e.volume);e.gameManager.setFastForwardRatio(+settings.speed);e.gameManager.toggleFastForward(+settings.speed>1?1:0)}
+ const e=emulator();if(e?.started){e.volume=settings.mute?0:settings.volume/100;e.setVolume(e.volume)}
+ updateSpeed()
  place()
 }
 el('sharp-image').addEventListener('change',apply);el('control-size').addEventListener('input',place);

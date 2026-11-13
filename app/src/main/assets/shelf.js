@@ -1,6 +1,5 @@
 const info=JSON.parse(Android.info()),games=JSON.parse(Android.library());
-el('guide').open=!read('seenGuide',false);write('seenGuide',true);
-el('help').onclick=()=>{el('guide').open=true;el('guide').scrollIntoView()};
+el('help').onclick=()=>{show('Como jogar');detail.append(make('p','Importe uma ROM .gba ou um ZIP e toque em Jogar. A partida abre em tela cheia. Toque em 1× para alternar a velocidade.'),make('p','Salve pelo menu do jogo. Para guardar uma cópia, abra Mais e escolha Backup do último jogo.'))};
 el('import').onclick=()=>Android.pick();el('continue').onclick=()=>Android.play();
 el('saved').hidden=el('tools').hidden=el('progress').hidden=!info.available;
 el('exp').onclick=()=>Android.backup(true);
