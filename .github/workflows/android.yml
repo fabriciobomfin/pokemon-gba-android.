@@ -21,10 +21,11 @@ jobs:
           mkdir -p app/src/main/assets/data
           cp -r /tmp/emulatorjs/data/. app/src/main/assets/data/
           test -f app/src/main/assets/data/loader.js
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
       - name: Build debug APK
-        run: |
-          gradle --version
-          gradle assembleDebug --no-daemon
+        run: gradle assembleDebug --no-daemon
       - uses: actions/upload-artifact@v4
         with:
           name: pokemon-gba-offline-debug-apk
