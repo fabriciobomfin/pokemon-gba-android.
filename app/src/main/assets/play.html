@@ -19,11 +19,12 @@ window.EJS_controlScheme='gba';
 window.EJS_Buttons={netplay:false,volume:true,saveState:false,loadState:false,saveSavFiles:false,loadSavFiles:false,screenRecord:false};
 window.EJS_defaultOptions={'save-save-interval':5,'virtual-gamepad':'enabled'};
 let wasRunning=false;
-function saveGame(notify){const e=window.EJS_emulator;if(e&&e.started&&e.gameManager){e.gameManager.saveSaveFiles();e.gameManager.FS.syncfs(false,err=>{if(notify)document.getElementById('status').textContent=err?'Erro ao gravar progresso':'Progresso gravado no celular';});}}
+function toBase64(bytes){let value='';for(let offset=0;offset<bytes.length;offset+=8192)value+=String.fromCharCode.apply(null,bytes.subarray(offset,offset+8192));return btoa(value);}
+function saveGame(notify){const e=window.EJS_emulator;if(!e||!e.started||!e.gameManager)return false;const g=e.gameManager;g.saveSaveFiles();let files={};for(const name of g.FS.readdir('/data/saves')){if(name==='.'||name==='..')continue;const path='/data/saves/'+name;if(g.FS.isFile(g.FS.stat(path).mode))files[name]=toBase64(g.FS.readFile(path));}const ok=Android.saveFiles(JSON.stringify(files));g.FS.syncfs(false,()=>{});if(notify)document.getElementById('status').textContent=ok?'Progresso gravado no celular':'Erro ao gravar progresso';return ok;}
 window.flushAndPause=()=>{const e=window.EJS_emulator;wasRunning=!!(e&&e.started&&!e.paused);saveGame(false);if(wasRunning)e.pause();};
 window.resumeGame=()=>{const e=window.EJS_emulator;if(wasRunning&&e&&e.started)e.play();wasRunning=false;};
-window.leaveGame=()=>{const e=window.EJS_emulator;if(e&&e.started){e.gameManager.saveSaveFiles();e.gameManager.FS.syncfs(false,()=>Android.home());}else Android.home();};
-window.EJS_ready=()=>{document.getElementById('status').textContent='Toque em Jogar offline';};
+window.leaveGame=()=>{saveGame(false);Android.home();};
+window.EJS_ready=()=>{document.getElementById('status').textContent='Toque em Jogar offline';EJS_emulator.on('saveDatabaseLoaded',fs=>{const files=JSON.parse(Android.loadFiles());for(const name of Object.keys(files)){const value=atob(files[name]);const bytes=new Uint8Array(value.length);for(let i=0;i<value.length;i++)bytes[i]=value.charCodeAt(i);fs.writeFile('/data/saves/'+name,bytes);}});};
 window.EJS_onGameStart=()=>{document.getElementById('status').textContent='Offline · salve pelo menu do jogo';setInterval(()=>saveGame(false),5000);};
 window.runtimeErrors=[];
 window.addEventListener('error',event=>{window.runtimeErrors.push(event.message);if(window.webviewUnsupported)return;document.getElementById('error').style.display='block';document.getElementById('errorText').textContent=event.message||'Falha ao carregar um componente local.';});

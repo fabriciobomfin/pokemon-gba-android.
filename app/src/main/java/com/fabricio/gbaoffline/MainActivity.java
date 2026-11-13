@@ -116,6 +116,53 @@ public class MainActivity extends Activity {
             runOnUiThread(() -> { if (!importing && new File(getFilesDir(), "game.gba").isFile()) web.loadUrl(PLAY); });
         }
         @JavascriptInterface public void home() { runOnUiThread(() -> web.loadUrl(HOME)); }
+        @JavascriptInterface public boolean saveFiles(String json) {
+            try {
+                if (json.length() > 8 * 1024 * 1024) return false;
+                JSONObject files = new JSONObject(json);
+                if (files.length() > 32) return false;
+                File directory = saveDirectory();
+                java.util.Iterator<String> names = files.keys();
+                while (names.hasNext()) {
+                    String name = names.next();
+                    if (!safeSaveName(name)) return false;
+                    byte[] bytes = android.util.Base64.decode(files.getString(name), android.util.Base64.DEFAULT);
+                    if (bytes.length > 2 * 1024 * 1024) return false;
+                    AtomicFile file = new AtomicFile(new File(directory, name));
+                    FileOutputStream out = file.startWrite();
+                    try { out.write(bytes); file.finishWrite(out); }
+                    catch (IOException error) { file.failWrite(out); throw error; }
+                }
+                return true;
+            } catch (Exception error) { return false; }
+        }
+        @JavascriptInterface public String loadFiles() {
+            JSONObject result = new JSONObject();
+            try {
+                File[] files = saveDirectory().listFiles();
+                if (files != null) for (File file : files) {
+                    String name = file.getName();
+                    if (!file.isFile() || !safeSaveName(name) || name.endsWith(".new") || name.endsWith(".bak") || file.length() > 2 * 1024 * 1024) continue;
+                    try (InputStream input = new AtomicFile(file).openRead(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+                        byte[] buffer = new byte[8192]; int count;
+                        while ((count=input.read(buffer))!=-1) out.write(buffer,0,count);
+                        result.put(name,android.util.Base64.encodeToString(out.toByteArray(),android.util.Base64.NO_WRAP));
+                    }
+                }
+            } catch (Exception ignored) { }
+            return result.toString();
+        }
+    }
+
+    private boolean safeSaveName(String name) {
+        return name.matches("[a-zA-Z0-9._-]{1,160}") && !name.equals(".") && !name.equals("..");
+    }
+    private File saveDirectory() throws IOException {
+        String id = getPreferences(MODE_PRIVATE).getString("romId", "game");
+        if (!id.matches("[a-zA-Z0-9_-]{1,80}")) throw new IOException("Invalid ROM id");
+        File directory = new File(new File(getFilesDir(), "saves"), id);
+        if (!directory.isDirectory() && !directory.mkdirs()) throw new IOException("Unable to create save directory");
+        return directory;
     }
 
     @Override protected void onActivityResult(int request, int result, Intent data) {

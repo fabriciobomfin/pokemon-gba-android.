@@ -74,9 +74,11 @@ public class OfflineSmokeRunner extends Instrumentation {
             require(redPixels>1000,"Expected red homebrew framebuffer, found " + redPixels + " red pixels");
             screenshot.recycle();
             require("true".equals(js(app,"document.querySelectorAll('.ejs_virtualGamepad_button').length>=6")),"Touch controls missing");
-            // Verify IndexedDB-backed saves can be persisted and survive activity restart.
+            // Exercise production native save persistence and restore before the core starts.
             js(app,"window.persistDone=false;EJS_emulator.gameManager.FS.writeFile('/data/saves/offline-test',new Uint8Array([11,22,33]));EJS_emulator.gameManager.FS.syncfs(false,()=>window.persistDone=true);true");
             waitJs(app,"window.persistDone===true");
+            require("true".equals(js(app,"saveGame(false)")),"Native save write failed");
+            require("true".equals(js(app,"!!JSON.parse(Android.loadFiles())['offline-test']")),"Native save read failed");
             // Invalid imports must not destroy an existing valid ROM.
             File bad = new File(getTargetContext().getCacheDir(),"invalid.gba");
             try(FileOutputStream out=new FileOutputStream(bad)){out.write(new byte[256]);}
@@ -85,7 +87,7 @@ public class OfflineSmokeRunner extends Instrumentation {
             try(FileInputStream previous=new FileInputStream(new File(getTargetContext().getFilesDir(),"game.gba"))){
                 byte[] original=new byte[256];require(previous.read(original)==256 && original[0xb2]==(byte)0x96,"Invalid import damaged previous ROM");
             }
-            js(app,"Android.home();true");
+            js(app,"leaveGame();true");
             waitJs(app,"!!document.getElementById('continue') && !document.getElementById('saved').hidden");
             js(app,"Android.play();true");
             waitJs(app,"!!document.querySelector('.ejs_start_button')");
