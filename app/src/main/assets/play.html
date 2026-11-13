@@ -6,7 +6,7 @@ const rom=JSON.parse(Android.info());
 if(!rom.available) Android.home();
 window.EJS_player='#game';
 window.EJS_core='mgba';
-window.EJS_gameUrl='/rom.gba';
+window.EJS_gameUrl='/roms/'+rom.id+'.gba';
 window.EJS_gameName='gba-'+rom.id;
 window.EJS_pathtodata='/assets/data/';
 window.EJS_language='pt-BR';
@@ -25,5 +25,7 @@ window.resumeGame=()=>{const e=window.EJS_emulator;if(wasRunning&&e&&e.started)e
 window.leaveGame=()=>{const e=window.EJS_emulator;if(e&&e.started){e.gameManager.saveSaveFiles();e.gameManager.FS.syncfs(false,()=>Android.home());}else Android.home();};
 window.EJS_ready=()=>{document.getElementById('status').textContent='Toque em Jogar offline';};
 window.EJS_onGameStart=()=>{document.getElementById('status').textContent='Offline · salve pelo menu do jogo';setInterval(()=>saveGame(false),5000);};
-window.addEventListener('error',event=>{document.getElementById('error').style.display='block';document.getElementById('errorText').textContent=event.message||'Falha ao carregar um componente local.';});
+window.runtimeErrors=[];
+window.addEventListener('error',event=>{window.runtimeErrors.push(event.message);document.getElementById('error').style.display='block';document.getElementById('errorText').textContent=event.message||'Falha ao carregar um componente local.';});
+try{new Function('let a={}; a.x ??= 1; return a?.x;')();}catch(error){document.getElementById('error').style.display='block';document.getElementById('errorText').textContent='Atualize o Android System WebView pela Play Store e reabra o aplicativo. O componente instalado no celular é antigo demais para este emulador.';}
 </script><script src="/assets/data/loader.js"></script></body></html>

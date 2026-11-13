@@ -64,7 +64,7 @@ public class MainActivity extends Activity {
                 if (path == null || path.contains("..")) return error(404, "Not Found");
                 try {
                     InputStream stream;
-                    if (path.equals("/rom.gba")) {
+                    if (path.equals("/roms/" + getPreferences(MODE_PRIVATE).getString("romId", "game") + ".gba")) {
                         stream = new AtomicFile(new File(getFilesDir(), "game.gba")).openRead();
                     } else if (path.startsWith("/assets/")) {
                         stream = getAssets().open(path.substring(8));

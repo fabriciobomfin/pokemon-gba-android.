@@ -45,13 +45,20 @@ jobs:
       - name: Android offline import and gameplay smoke test
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 29
+          api-level: 35
           arch: x86_64
-          target: default
+          target: google_apis
           profile: pixel_2
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          script: gradle connectedDebugAndroidTest --no-daemon --stacktrace
+          script: |
+            mkdir -p app/build/reports/device
+            adb shell svc wifi disable
+            adb shell svc data disable
+            if gradle connectedDebugAndroidTest --no-daemon --stacktrace; then result=0; else result=1; fi
+            adb exec-out run-as com.fabricio.gbaoffline cat cache/smoke.png > app/build/reports/device/framebuffer.png || true
+            adb logcat -d > app/build/reports/device/logcat.txt
+            exit "$result"
       - uses: actions/upload-artifact@v4
         if: always()
         with:

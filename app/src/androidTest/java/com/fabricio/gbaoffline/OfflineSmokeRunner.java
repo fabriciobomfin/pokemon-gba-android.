@@ -7,6 +7,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.FileInputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.concurrent.CountDownLatch;
@@ -28,7 +29,7 @@ public class OfflineSmokeRunner extends Instrumentation {
             if ("true".equals(js(activity, script))) return;
             Thread.sleep(500);
         }
-        throw new AssertionError("Condition timed out: " + script + " URL=" + js(activity,"location.href") + " body=" + js(activity,"document.body.innerText"));
+        throw new AssertionError("Condition timed out: " + script + " URL=" + js(activity,"location.href") + " body=" + js(activity,"document.body.innerText") + " errors=" + js(activity,"JSON.stringify(window.runtimeErrors)"));
     }
     private void require(boolean valid, String message) { if (!valid) throw new AssertionError(message); }
     @Override public void onStart() {
@@ -60,6 +61,19 @@ public class OfflineSmokeRunner extends Instrumentation {
             js(app, "document.querySelector('.ejs_start_button').click();true");
             waitJs(app, "!!(window.EJS_emulator && EJS_emulator.started && EJS_emulator.gameManager && EJS_emulator.gameManager.getFrameNum()>120)");
             require("true".equals(js(app,"document.querySelector('canvas').width>=240")),"GBA canvas missing");
+            android.graphics.Bitmap screenshot = getUiAutomation().takeScreenshot();
+            require(screenshot != null, "Android screenshot unavailable");
+            try(FileOutputStream image=new FileOutputStream(new File(getTargetContext().getCacheDir(),"smoke.png"))) {
+                screenshot.compress(android.graphics.Bitmap.CompressFormat.PNG,100,image);
+            }
+            int redPixels=0;
+            for(int y=0;y<screenshot.getHeight();y+=3)for(int x=0;x<screenshot.getWidth();x+=3){
+                int color=screenshot.getPixel(x,y);
+                if(android.graphics.Color.red(color)>200 && android.graphics.Color.green(color)<80 && android.graphics.Color.blue(color)<80)redPixels++;
+            }
+            require(redPixels>1000,"Expected red homebrew framebuffer, found " + redPixels + " red pixels");
+            screenshot.recycle();
+            require("true".equals(js(app,"document.querySelectorAll('.ejs_virtualGamepad_button').length>=6")),"Touch controls missing");
             // Verify IndexedDB-backed saves can be persisted and survive activity restart.
             js(app,"window.persistDone=false;EJS_emulator.gameManager.FS.writeFile('/data/saves/offline-test',[11,22,33]);EJS_emulator.gameManager.FS.syncfs(false,()=>window.persistDone=true);true");
             waitJs(app,"window.persistDone===true");
@@ -68,7 +82,9 @@ public class OfflineSmokeRunner extends Instrumentation {
             try(FileOutputStream out=new FileOutputStream(bad)){out.write(new byte[256]);}
             runOnMainSync(()->app.importRom(Uri.fromFile(bad)));
             Thread.sleep(1500);
-            require(new File(getTargetContext().getFilesDir(),"game.gba").length()==256,"Invalid import damaged previous ROM");
+            try(FileInputStream previous=new FileInputStream(new File(getTargetContext().getFilesDir(),"game.gba"))){
+                byte[] original=new byte[256];require(previous.read(original)==256 && original[0xb2]==(byte)0x96,"Invalid import damaged previous ROM");
+            }
             js(app,"Android.home();true");
             waitJs(app,"!!document.getElementById('continue') && !document.getElementById('saved').hidden");
             js(app,"Android.play();true");

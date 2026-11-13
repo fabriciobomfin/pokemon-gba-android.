@@ -1,6 +1,6 @@
 # GBA Offline para Android
 
-Emulador GBA com EmulatorJS 4.2.3 e mGBA empacotados no APK. Android 7.0 ou mais recente.
+Emulador GBA com EmulatorJS 4.2.3 e mGBA empacotados no APK. Android 7.0 ou mais recente, com Android System WebView atualizado. O CI valida em Android 15 (API 35).
 
 ## Instalação e jogo
 
@@ -21,13 +21,13 @@ gradle connectedDebugAndroidTest
 
 O workflow instala os pacotes específicos do SDK, sem solicitar o pacote removido `tools`. Os componentes do EmulatorJS são baixados **somente durante a compilação**, com versão fixa e SHA-256 verificado. Os dois núcleos mGBA (WebGL e legado), descompactador, traduções, JavaScript e CSS são incluídos e verificados dentro do APK. Nenhum componente é baixado enquanto se joga.
 
-A instrumentação Android importa um programa homebrew original de 256 bytes, executa mais de 120 frames, verifica a reabertura, a persistência dos saves e a preservação da ROM anterior ao selecionar arquivo inválido. ROMs comerciais não são utilizadas no CI.
+A instrumentação Android importa um programa homebrew original de 256 bytes, executa mais de 120 frames, confere pixels da tela, controles de toque, a reabertura e a persistência dos saves e a preservação da ROM anterior ao selecionar arquivo inválido. ROMs comerciais não são utilizadas no CI.
 
 ## Licenças e código-fonte
 
 - Aplicativo e frontend: GNU GPL v3; texto em `app/src/main/assets/GPL-3.0.txt`.
 - [EmulatorJS v4.2.3](https://github.com/EmulatorJS/EmulatorJS/tree/v4.2.3).
 - [Build do núcleo](https://github.com/EmulatorJS/build), pacote mGBA de 14/06/2025 e avisos de licença incorporados no `.data`.
-- [mGBA](https://github.com/mgba-emu/mgba): Mozilla Public License 2.0.
+- [mGBA](https://github.com/EmulatorJS/mgba): Mozilla Public License 2.0.
 
 Não adicione jogos, BIOS nem saves pessoais ao git. Eles estão ignorados, e o CI também rejeita APKs com arquivos de ROM.
