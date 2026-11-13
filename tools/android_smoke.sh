@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -uo pipefail
 mkdir -p app/build/reports/device
+# A fresh emulator presents Android's immersive-mode tutorial over the framebuffer.
+adb shell settings put secure immersive_mode_confirmations confirmed || exit 1
 adb shell svc wifi disable
 adb shell svc data disable
 gradle assembleDebugAndroidTest --no-daemon --stacktrace || exit 1
