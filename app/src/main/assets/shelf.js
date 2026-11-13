@@ -24,3 +24,7 @@ function render(){
 el('sort').value=read('shelfSort','recent');el('sort').onchange=()=>{write('shelfSort',el('sort').value);render()};el('search').oninput=el('fav').onchange=render;render();
 let urls=[];dialog.onclose=()=>{urls.forEach(URL.revokeObjectURL);urls=[]};
 el('shots').onclick=async()=>{show('Galeria local');const gallery=make('div');gallery.id='gallery';detail.append(gallery);try{const shots=await photos('readonly',store=>store.getAll());if(!shots.length)gallery.append(make('p','As capturas feitas durante o jogo aparecem aqui.'));for(const shot of shots.reverse()){const fig=make('figure'),img=make('img');img.src=URL.createObjectURL(shot.blob);urls.push(img.src);img.alt=shot.name;fig.append(img,make('figcaption',shot.name+' · '+new Date(shot.time).toLocaleString('pt-BR')),action('Excluir captura',async()=>{if(confirm('Excluir esta captura?')){await photos('readwrite',s=>s.delete(shot.time));fig.remove()}}));gallery.append(fig)}}catch{gallery.textContent='Falha ao abrir as capturas.'}};
+
+for(const [selector,icon] of [['.shelf h1','library'],['#help','guide'],['#shots','gallery'],['#progress summary','backup'],['#tools summary','search'],['.utility a','document']]){
+ document.querySelector(selector).prepend(sectionIcon(icon));
+}

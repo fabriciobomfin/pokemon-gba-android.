@@ -33,20 +33,26 @@ for(const [key,label] of Object.entries({mute:'Silenciar áudio',focus:'Tela che
 const clock=make('span');clock.id='timer';el('app-header').querySelector('.brand-line').append(clock);
 el('reopen').onclick=()=>toggleSettings(true);
 quick.append(action('Restaurar posições',()=>{settings.positions={};persist();place()}));
-function addCategory(title, fields, actions=[]) {
+function addCategory(title, icon, fields, actions=[]) {
  const group=make('details');group.className='category';
- group.append(make('summary',title));panel.append(group);
+ const summary=make('summary',title);summary.prepend(sectionIcon(icon));group.append(summary);panel.append(group);
  for(const field of fields)group.append(el(field).closest('.setting'));
  for(const button of actions)group.append(button);
  group.addEventListener('toggle',()=>{if(group.open)for(const other of panel.querySelectorAll('.category'))if(other!==group)other.open=false});
 }
 const [pause,capture,restart,library,move,reset]=Array.from(quick.children);
 quick.replaceChildren(pause,library);
-addCategory('Vídeo',['pref-focus','pref-orientation','pref-fit','pref-filter','sharp-image','pref-brightness','pref-saturation']);
-addCategory('Áudio',['pref-volume','pref-mute']);
-addCategory('Controles',['pref-preset','control-size','control-opacity','show-controls','pref-haptic','pref-swap','pref-diagonal'],[move,reset]);
-addCategory('Aparência e acessibilidade',['pref-theme','pref-contrast','pref-bigtext']);
-addCategory('Avançado',['pref-interval','pref-clock','pref-timer'],[action('Gravar progresso',()=>saveGame(true)),capture,restart]);
+library.prepend(sectionIcon('library'));
+for(const id of ['reopen','settings-toggle']){
+ const button=el(id);button.replaceChildren(sectionIcon('gear'));
+ button.setAttribute('aria-label','Configurações do jogo');
+ button.setAttribute('aria-controls','settings-panel');button.setAttribute('aria-expanded','false');
+}
+addCategory('Vídeo','screen',['pref-focus','pref-orientation','pref-fit','pref-filter','sharp-image','pref-brightness','pref-saturation']);
+addCategory('Áudio','sound',['pref-volume','pref-mute']);
+addCategory('Controles','controller',['pref-preset','control-size','control-opacity','show-controls','pref-haptic','pref-swap','pref-diagonal'],[move,reset]);
+addCategory('Aparência e acessibilidade','palette',['pref-theme','pref-contrast','pref-bigtext']);
+addCategory('Avançado','sliders',['pref-interval','pref-clock','pref-timer'],[action('Gravar progresso',()=>saveGame(true)),capture,restart]);
 const speedButton=el('speed-button');
 function updateSpeed(){
  const host=settings.focus?document.body:document.querySelector('.toolbar');
