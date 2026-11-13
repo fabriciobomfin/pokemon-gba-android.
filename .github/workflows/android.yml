@@ -24,6 +24,16 @@ jobs:
           mkdir -p app/src/main/assets/data
           cp -r /tmp/emulatorjs/data/. app/src/main/assets/data/
           test -f app/src/main/assets/data/loader.js
+      - name: Bundle offline GBA runtime
+        run: |
+          DATA=app/src/main/assets/data
+          mkdir -p "$DATA/cores"
+          curl --fail --location --retry 3 https://cdn.emulatorjs.org/stable/data/emulator.min.js -o "$DATA/emulator.min.js"
+          curl --fail --location --retry 3 https://cdn.emulatorjs.org/stable/data/emulator.min.css -o "$DATA/emulator.min.css"
+          curl --fail --location --retry 3 https://cdn.emulatorjs.org/stable/data/cores/mgba-wasm.data -o "$DATA/cores/mgba-wasm.data"
+          test -s "$DATA/emulator.min.js"
+          test -s "$DATA/emulator.min.css"
+          test -s "$DATA/cores/mgba-wasm.data"
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
