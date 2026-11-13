@@ -3,7 +3,7 @@ android {
     namespace 'com.fabricio.gbaoffline'
     compileSdk 35
     defaultConfig {
-        applicationId 'com.fabricio.gbaoffline'
+        applicationId 'com.fabricio.lumepocket'
         minSdk 24
         targetSdk 35
         versionCode 3
