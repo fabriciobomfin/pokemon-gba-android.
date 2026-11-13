@@ -2,6 +2,7 @@ package com.fabricio.gbaoffline;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.content.pm.ActivityInfo;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.OpenableColumns;
@@ -116,7 +117,7 @@ public class MainActivity extends Activity {
             });
         }
         @JavascriptInterface public void orientation(int value) {
-            runOnUiThread(() -> setRequestedOrientation(value == 1 ? 1 : value == 2 ? 0 : -1));
+            runOnUiThread(() -> setRequestedOrientation(value == 1 ? ActivityInfo.SCREEN_ORIENTATION_PORTRAIT : value == 2 ? ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE : ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED));
         }
         @JavascriptInterface public void immersive(boolean value) {
             runOnUiThread(() -> getWindow().getDecorView().setSystemUiVisibility(value ? 5894 : 0));
