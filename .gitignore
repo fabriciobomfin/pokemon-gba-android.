@@ -1,0 +1,16 @@
+.gradle/
+**/build/
+local.properties
+*.jks
+*.keystore
+# Games and personal saves must never be committed.
+*.gba
+*.gb
+*.gbc
+*.rom
+*.sav
+*.srm
+*.state
+app/src/main/assets/data/
+__pycache__/
+*.pyc
