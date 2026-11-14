@@ -133,14 +133,17 @@ public class OfflineSmokeRunner extends Instrumentation {
             waitJs(app, "typeof Android!=='undefined' && !!document.getElementById('import')");
             if(phase.startsWith("upgrade-")){
                 if("upgrade-seed".equals(phase)){
-                    js(app,"localStorage.setItem('upgrade-marker','keep-me')");
+                    String preserved=js(app,"JSON.stringify({library:JSON.parse(Android.library()),theme:read('fire-game-theme',null),profiles:Object.keys(localStorage).filter(k=>k.startsWith('pocket:')).sort().map(k=>[k,localStorage.getItem(k)])})");
+                    require("true".equals(js(app,"Object.keys(JSON.parse(Android.library())).length===2 && read('fire-game-theme',null)==='dourado'")),"Expected pre-update library and theme missing");
                     getTargetContext().getSharedPreferences("upgrade-test",0).edit()
-                        .putInt("version",getTargetContext().getPackageManager().getPackageInfo(getTargetContext().getPackageName(),0).versionCode).commit();
+                        .putString("preserved",preserved).putInt("version",getTargetContext().getPackageManager().getPackageInfo(getTargetContext().getPackageName(),0).versionCode).commit();
                 }else{
                     int previous=getTargetContext().getSharedPreferences("upgrade-test",0).getInt("version",-1);
                     require(previous>0 && getTargetContext().getPackageManager().getPackageInfo(getTargetContext().getPackageName(),0).versionCode>previous,"Version did not increase");
-                    require("true".equals(js(app,"localStorage.getItem('upgrade-marker')==='keep-me' && Object.keys(JSON.parse(Android.library())).length===2")),"Preferences or ROM library lost during update");
+                    String preserved=js(app,"JSON.stringify({library:JSON.parse(Android.library()),theme:read('fire-game-theme',null),profiles:Object.keys(localStorage).filter(k=>k.startsWith('pocket:')).sort().map(k=>[k,localStorage.getItem(k)])})");
+                    require(preserved.equals(getTargetContext().getSharedPreferences("upgrade-test",0).getString("preserved","")),"Existing preferences or ROM library changed during update: "+preserved);
                     phase="ds-reopen";testDs(app);
+                    waitJs(app,"!el('load-point').disabled");
                 }
                 Bundle result=new Bundle();result.putString("stream","\nOK (1 test)\n");finish(Activity.RESULT_OK,result);return;
             }
