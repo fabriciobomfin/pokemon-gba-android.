@@ -3,7 +3,7 @@ android {
     namespace 'com.fabricio.gbaoffline'
     compileSdk 35
     defaultConfig {
-        applicationId 'com.fabricio.firegame'
+        applicationId 'com.fabricio.firegame.stable'
         minSdk 24
         targetSdk 35
         versionCode = (project.findProperty('fireVersionCode') ?: '14').toInteger()

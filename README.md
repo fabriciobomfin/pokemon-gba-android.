@@ -61,7 +61,7 @@ Não adicione jogos, BIOS nem saves pessoais ao git. Eles estão ignorados, e o 
 
 
 ### Fire Game 3.1 — atualizações sem reinstalação
-- Identificador permanente de produção: `com.fabricio.firegame`. Nunca alterar nas próximas versões.
+- Identificador permanente de produção: `com.fabricio.firegame.stable`. Nunca alterar nas próximas versões.
 - `versionCode` atual: 14. Aumentar em toda atualização publicada; manter os dados e formatos de backup compatíveis.
 - Builds de teste usam `.testbuild` e não são distribuídos. Builds release não usam a chave debug.
 - Certificado público esperado: `tools/signing-certificate.sha256`. O script `tools/sign_release.py` recusa qualquer outra chave.
