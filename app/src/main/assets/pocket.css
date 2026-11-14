@@ -50,3 +50,19 @@ body #reopen.floating-tool{display:grid;place-items:center}
 /* Remove letterboxing inside the emulation framebuffer before fitting its image. */
 body[data-fit=fill] #game canvas{width:100%!important;height:100%!important;object-fit:fill!important;transform:translate(-50%,-50%) scale(var(--crop-x,1),var(--crop-y,1))!important}
 body[data-fit=cover] #game canvas{width:max(100cqw,150cqh)!important;height:max(100cqh,66.667cqw)!important;object-fit:fill!important;transform:translate(-50%,-50%) scale(var(--crop-x,1),var(--crop-y,1))!important}
+
+.shelf{padding-bottom:100px}.shelf h2{font-size:20px}
+#home-nav{position:fixed;z-index:4;bottom:0;inset-inline:0;margin:auto;width:min(100%,700px);display:flex;justify-content:space-around;background:var(--panel);border-top:1px solid var(--line);padding:5px 8px max(5px,env(safe-area-inset-bottom))}
+#home-nav button{border:0;color:var(--muted);font-size:13px;flex:1}
+#home-nav button[aria-current=page]{color:var(--accent);background:var(--base)}
+#home-nav svg{display:block;margin:0 auto 3px}
+#recent-games{display:flex;gap:8px;overflow:auto}#recent-games button{min-width:110px;max-width:200px;flex-shrink:0;overflow-wrap:anywhere;text-align:left}
+#gba-category{display:grid;gap:8px;text-align:left;padding:20px;width:min(100%,300px)}#gba-category svg{height:44px;width:44px;color:var(--accent)}
+#gallery{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(135px,45%),1fr));gap:12px}
+#gallery button{text-align:left;padding:6px;overflow:hidden}
+#gallery strong{display:block;padding:8px}#gallery button[aria-pressed=true]{outline:2px solid var(--accent)}
+#gallery button[aria-pressed=true] strong:after{content:' ✓';color:var(--accent)}
+.console-preview{position:relative;display:block;border-radius:8px;height:90px;background:linear-gradient(145deg,var(--sample-panel),var(--sample-base));border:1px solid var(--sample-line)}
+.console-preview i{position:absolute;display:grid;place-items:center;border-radius:50%;width:25px;height:25px;background:var(--sample-accent);color:var(--sample-base);font:700 12px system-ui}
+.console-preview i:first-child{top:26%;left:9%;width:41px;height:41px;color:var(--sample-accent);background:var(--sample-panel);border:1px solid var(--sample-line);font-size:24px}
+.console-preview i:nth-child(2){right:26%;top:50%}.console-preview i:last-child{right:6%;top:27%}

@@ -47,12 +47,50 @@ function edit(id){
 function render(){
  const ids=Object.keys(games),q=el('search').value.toLocaleLowerCase(),order=el('sort').value;
  el('romName').textContent=gameMeta(info.id).name||info.name;el('list').replaceChildren();
+ const recent=ids.filter(id=>gameMeta(id).last).sort((a,b)=>gameMeta(b).last-gameMeta(a).last).slice(0,5);
+ el('recent').hidden=!recent.length;
+ el('recent-games').replaceChildren(...recent.map(id=>action(gameMeta(id).name||games[id],()=>Android.select(id))));
+ el('game-count').textContent=ids.length+(ids.length===1?' jogo':' jogos');
  const rows=ids.map(id=>({id,...gameMeta(id),name:gameMeta(id).name||games[id]})).filter(g=>g.name.toLocaleLowerCase().includes(q)&&(!el('fav').checked||g.star));
  rows.sort((a,b)=>order==='name'?a.name.localeCompare(b.name,'pt-BR'):order==='time'?(b.seconds||0)-(a.seconds||0):(b.last||0)-(a.last||0));
  for(const g of rows){const row=make('article');row.className='gamecard';const b=action(g.name,()=>Android.select(g.id));b.className='title';b.append(make('small',g.last?'Última sessão · '+new Date(g.last).toLocaleDateString('pt-BR'):'Importado'));const star=action(g.star?'★':'☆',()=>{updateMeta(g.id,{star:!g.star});render()});star.setAttribute('aria-label',g.star?'Remover favorito':'Favoritar');row.append(b,star,action('Detalhes',()=>edit(g.id)));el('list').append(row)}
  if(!rows.length)el('list').append(make('p',ids.length?'Nenhum jogo corresponde ao filtro.':'Sua biblioteca começa com a primeira ROM.'))
 }
 el('sort').value=read('shelfSort','recent');el('sort').onchange=()=>{write('shelfSort',el('sort').value);render()};el('search').oninput=el('fav').onchange=render;render();
-for(const [selector,icon] of [['.shelf h1','library'],['#help','guide'],['#progress summary','backup'],['#tools summary','search'],['.utility a','document']]){
+for(const [selector,icon] of [['#home-page h1','library'],['#help','guide'],['#progress summary','backup'],['#tools summary','search'],['.utility a','document']]){
  document.querySelector(selector).prepend(sectionIcon(icon));
 }
+
+function openPage(name){
+ for(const button of document.querySelectorAll('#home-nav button')){
+  const selected=button.dataset.page===name;
+  el(button.dataset.page+'-page').hidden=!selected;
+  button.setAttribute('aria-current',selected?'page':'false');
+ }
+ window.scrollTo(0,0);
+}
+for(const [name,icon] of [['home','library'],['categories','controller'],['themes','palette']]){
+ const button=document.querySelector('[data-page="'+name+'"]');
+ button.prepend(sectionIcon(icon));
+ button.onclick=()=>openPage(name);
+}
+el('gba-category').prepend(sectionIcon('controller'));
+el('gba-category').onclick=()=>{
+ el('search').value='';el('fav').checked=false;render();openPage('home');
+ document.querySelector('#home-page h1').scrollIntoView();
+};
+function selectTheme(id){
+ applyTheme(id);write('fire-game-theme',id);
+ for(const tile of el('gallery').children)tile.setAttribute('aria-pressed',String(tile.dataset.id===id));
+}
+for(const [id,theme] of Object.entries(themes)){
+ const tile=action('',()=>selectTheme(id));tile.dataset.id=id;
+ tile.style.setProperty('--sample-base',theme.colors[0]);tile.style.setProperty('--sample-panel',theme.colors[1]);
+ tile.style.setProperty('--sample-line',theme.colors[2]);tile.style.setProperty('--sample-accent',theme.colors[5]);
+ const preview=make('span');preview.className='console-preview';preview.setAttribute('aria-hidden','true');
+ for(const label of ['✚','B','A'])preview.append(make('i',label));
+ tile.append(preview,make('strong',theme.name));
+ tile.setAttribute('aria-pressed',String(document.documentElement.dataset.theme===id));
+ el('gallery').append(tile);
+}
+openPage('home');

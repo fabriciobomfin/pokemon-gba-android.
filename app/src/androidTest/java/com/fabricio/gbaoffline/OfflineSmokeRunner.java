@@ -53,6 +53,11 @@ public class OfflineSmokeRunner extends Instrumentation {
             activity = (MainActivity)startActivitySync(launch);
             final MainActivity app = activity;
             waitJs(app, "typeof Android!=='undefined' && !!document.getElementById('import')");
+            waitJs(app,"document.querySelectorAll('#gallery button').length===11");
+            require("true".equals(js(app,"openPage('categories'); !el('categories-page').hidden && el('game-count').textContent==='0 jogos'")),"Empty category count");
+            require("true".equals(js(app,"el('gba-category').click(); !el('home-page').hidden && el('recent').hidden")),"Category navigation failed");
+            require("true".equals(js(app,"document.querySelector('[data-page=themes]').click(); Array.from(el('gallery').children).every(b=>{b.click();return b.getAttribute('aria-pressed')==='true' && document.documentElement.dataset.theme===b.dataset.id && read('fire-game-theme','')===b.dataset.id})")),"Theme gallery selection failed");
+            js(app,"document.querySelector('[data-id=ciano]').click();openPage('home')");
             // ARM code: set mode 3, fill VRAM red, then loop. No BIOS/logo/game assets.
             byte[] rom = new byte[256];
             ByteBuffer words=ByteBuffer.wrap(rom).order(ByteOrder.LITTLE_ENDIAN);
@@ -66,7 +71,7 @@ public class OfflineSmokeRunner extends Instrumentation {
             runOnMainSync(() -> app.onActivityResult(12,Activity.RESULT_OK,new Intent().setData(Uri.fromFile(file))));
             waitJs(app, "location.pathname.endsWith('/play.html') && !!window.EJS_emulator");
             waitJs(app, "!!(window.EJS_emulator && EJS_emulator.started && EJS_emulator.gameManager && EJS_emulator.gameManager.getFrameNum()>120)");
-            require("true".equals(js(app,"document.querySelector('canvas').width>=240")),"GBA canvas missing");
+            require("true".equals(js(app,"settings.theme==='ciano' && document.querySelector('canvas').width>=240")),"GBA canvas missing");
             android.graphics.Bitmap screenshot = getUiAutomation().takeScreenshot();
             require(screenshot != null, "Android screenshot unavailable");
             try(FileOutputStream image=new FileOutputStream(new File(getTargetContext().getCacheDir(),"smoke.png"))) {
@@ -124,6 +129,8 @@ public class OfflineSmokeRunner extends Instrumentation {
             }
             js(app,"leaveGame();true");
             waitJs(app,"!!document.getElementById('continue') && !document.getElementById('saved').hidden");
+            require("true".equals(js(app,"el('game-count').textContent==='1 jogo' && !el('recent').hidden && el('recent-games').children.length===1 && document.querySelector('[data-id=dourado]').getAttribute('aria-pressed')==='true'")),"Library or theme after returning failed");
+            require("true".equals(js(app,"el('search').value='impossivel';render();!el('list').querySelector('article') && (el('gba-category').click(),el('list').querySelectorAll('article').length===1)")),"Search or category reset failed");
             // Export via the production document callback, erase the local records, then import.
             js(app,"el('exp').click()");
             Thread.sleep(1500);
