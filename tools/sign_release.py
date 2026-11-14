@@ -27,7 +27,7 @@ with tempfile.TemporaryDirectory() as folder:
 destination.parent.mkdir(parents=True, exist_ok=True)
 subprocess.run(['java', '-jar', signer, 'sign', '--ks', key,
     '--ks-key-alias', 'firegame', '--ks-pass', 'file:' + password,
-    '--key-pass', 'file:' + password, '--out', str(destination), str(source)], check=True)
+    '--out', str(destination), str(source)], check=True)
 verification = subprocess.check_output(['java', '-jar', signer, 'verify',
     '--verbose', '--print-certs', str(destination)], text=True)
 if 'Signer #1 certificate SHA-256 digest: ' + expected not in verification:
