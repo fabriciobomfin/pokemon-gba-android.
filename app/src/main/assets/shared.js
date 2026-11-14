@@ -39,12 +39,16 @@ const themes={
  brasa:{name:'Brasa',colors:['#23120e','#3e231a','#80503a','#fff1df','#ddbda7','#ffab70','#341b0c']},
  rubi:{name:'Rubi',colors:['#240f19','#401d2b','#814258','#fff0f2','#d6b2bd','#ff91ad','#3d1321']},
  rosa:{name:'Rosa',colors:['#21121f','#3a2338','#75536f','#fff0fb','#d4bad0','#f6a7d6','#381b2d']},
+ circuito:{name:'Circuito',pattern:'repeating-linear-gradient(135deg,transparent 0 13px,#48d9aa28 13px 15px,transparent 15px 26px),repeating-linear-gradient(45deg,#092722 0 28px,#104138 28px 30px)',colors:['#071e1b','#143630','#356558','#e6fff3','#a3cdbd','#83f1b8','#0a2d1b']},
+ aurora:{name:'Aurora',pattern:'radial-gradient(ellipse at 12% 100%,#096d7999,transparent 60%),radial-gradient(ellipse at 80% 10%,#7048a299,transparent 65%),linear-gradient(135deg,#0c2034,#21132e)',colors:['#101b31','#252641','#514d73','#eff2ff','#c0c3db','#a7dcec','#14283a']},
+ carbono:{name:'Fibra de carbono',pattern:'repeating-linear-gradient(45deg,#20232a 0 4px,#14171c 4px 8px,#1c2026 8px 12px)',colors:['#121417','#26282e','#555960','#fcf4df','#cdc4ad','#f5c554','#2a210b']},
  grafite:{name:'Grafite',colors:['#14171c','#272d35','#515c69','#f0f3f7','#bbc4d0','#becbdd','#1c2735']}
 };
 function applyTheme(name){
  const theme=themes[name]||themes.ameixa;
  ['--base','--panel','--line','--paper','--muted','--accent','--on-accent'].forEach((key,i)=>document.documentElement.style.setProperty(key,theme.colors[i]));
  document.documentElement.style.setProperty('--mint',theme.colors[5]);document.documentElement.style.setProperty('--ink',theme.colors[3]);
+ document.documentElement.style.setProperty('--console-surface',theme.pattern||'none');
  document.documentElement.dataset.theme=themes[name]?name:'ameixa';
 }
 applyTheme(read('fire-game-theme','ameixa'));

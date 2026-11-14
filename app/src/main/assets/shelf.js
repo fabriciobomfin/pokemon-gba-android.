@@ -85,6 +85,7 @@ function selectTheme(id){
 }
 for(const [id,theme] of Object.entries(themes)){
  const tile=action('',()=>selectTheme(id));tile.dataset.id=id;
+ if(theme.pattern)tile.style.setProperty('--sample-pattern',theme.pattern);
  tile.style.setProperty('--sample-base',theme.colors[0]);tile.style.setProperty('--sample-panel',theme.colors[1]);
  tile.style.setProperty('--sample-line',theme.colors[2]);tile.style.setProperty('--sample-accent',theme.colors[5]);
  const preview=make('span');preview.className='console-preview';preview.setAttribute('aria-hidden','true');

@@ -66,3 +66,7 @@ body[data-fit=cover] #game canvas{width:max(100cqw,150cqh)!important;height:max(
 .console-preview i{position:absolute;display:grid;place-items:center;border-radius:50%;width:25px;height:25px;background:var(--sample-accent);color:var(--sample-base);font:700 12px system-ui}
 .console-preview i:first-child{top:26%;left:9%;width:41px;height:41px;color:var(--sample-accent);background:var(--sample-panel);border:1px solid var(--sample-line);font-size:24px}
 .console-preview i:nth-child(2){right:26%;top:50%}.console-preview i:last-child{right:6%;top:27%}
+
+.console-preview{background-image:var(--sample-pattern,linear-gradient(145deg,var(--sample-panel),var(--sample-base)))}
+body[data-screen=console]{background-image:var(--console-surface)}
+@media(orientation:portrait){body[data-screen=console] #console{background-image:var(--console-surface)}}

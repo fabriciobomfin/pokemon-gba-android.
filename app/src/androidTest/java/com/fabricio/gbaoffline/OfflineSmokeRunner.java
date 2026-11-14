@@ -53,10 +53,10 @@ public class OfflineSmokeRunner extends Instrumentation {
             activity = (MainActivity)startActivitySync(launch);
             final MainActivity app = activity;
             waitJs(app, "typeof Android!=='undefined' && !!document.getElementById('import')");
-            waitJs(app,"document.querySelectorAll('#gallery button').length===11");
+            waitJs(app,"document.querySelectorAll('#gallery button').length===14");
             require("true".equals(js(app,"openPage('categories'); !el('categories-page').hidden && el('game-count').textContent==='0 jogos'")),"Empty category count");
             require("true".equals(js(app,"el('gba-category').click(); !el('home-page').hidden && el('recent').hidden")),"Category navigation failed");
-            require("true".equals(js(app,"document.querySelector('[data-page=themes]').click(); Array.from(el('gallery').children).every(b=>{b.click();return b.getAttribute('aria-pressed')==='true' && document.documentElement.dataset.theme===b.dataset.id && read('fire-game-theme','')===b.dataset.id})")),"Theme gallery selection failed");
+            require("true".equals(js(app,"document.querySelector('[data-page=themes]').click(); Array.from(el('gallery').children).every(b=>{b.click();return b.getAttribute('aria-pressed')==='true' && document.documentElement.dataset.theme===b.dataset.id && read('fire-game-theme','')===b.dataset.id && (!themes[b.dataset.id].pattern || getComputedStyle(b.firstChild).backgroundImage.includes('gradient'))})")),"Theme gallery selection failed");
             js(app,"document.querySelector('[data-id=ciano]').click();openPage('home')");
             // ARM code: set mode 3, fill VRAM red, then loop. No BIOS/logo/game assets.
             byte[] rom = new byte[256];
