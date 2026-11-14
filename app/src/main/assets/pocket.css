@@ -48,5 +48,5 @@ body.focus[data-screen=full] #console{inset:0}body[data-screen=full] #console .p
 body #reopen.floating-tool{display:grid;place-items:center}
 
 /* Remove letterboxing inside the emulation framebuffer before fitting its image. */
-body[data-fit=fill] #game canvas{width:calc(100% * var(--crop-x,1))!important;height:calc(100% * var(--crop-y,1))!important;object-fit:fill!important}
-body[data-fit=cover] #game canvas{width:calc(max(100cqw,150cqh) * var(--crop-x,1))!important;height:calc(max(100cqh,66.667cqw) * var(--crop-y,1))!important;object-fit:fill!important}
+body[data-fit=fill] #game canvas{width:100%!important;height:100%!important;object-fit:fill!important;transform:translate(-50%,-50%) scale(var(--crop-x,1),var(--crop-y,1))!important}
+body[data-fit=cover] #game canvas{width:max(100cqw,150cqh)!important;height:max(100cqh,66.667cqw)!important;object-fit:fill!important;transform:translate(-50%,-50%) scale(var(--crop-x,1),var(--crop-y,1))!important}
