@@ -13,5 +13,6 @@ adb shell am instrument -w -r com.fabricio.firegame.controls.test/com.fabricio.g
 if ! grep -Fq 'OK (1 test)' app/build/reports/device/instrumentation.txt; then test_result=1; fi
 adb exec-out run-as com.fabricio.firegame.controls cat cache/smoke.png > app/build/reports/device/framebuffer.png || true
 adb exec-out run-as com.fabricio.firegame.controls cat cache/controls-wide.png > app/build/reports/device/controls-wide.png || true
+adb exec-out run-as com.fabricio.firegame.controls cat cache/editor.png > app/build/reports/device/editor.png || true
 adb logcat -d > app/build/reports/device/logcat.txt || true
 exit "$test_result"

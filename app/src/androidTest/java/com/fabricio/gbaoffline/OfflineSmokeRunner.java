@@ -31,6 +31,14 @@ public class OfflineSmokeRunner extends Instrumentation {
         }
         throw new AssertionError("Condition timed out: " + script + " URL=" + js(activity,"location.href") + " body=" + js(activity,"document.body.innerText") + " errors=" + js(activity,"JSON.stringify(window.runtimeErrors)"));
     }
+    private void capture(String name) throws Exception {
+        android.graphics.Bitmap bitmap=getUiAutomation().takeScreenshot();
+        if(bitmap==null)throw new AssertionError("Screenshot unavailable");
+        try(java.io.ByteArrayOutputStream data=new java.io.ByteArrayOutputStream()){
+            if(!bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,data))throw new AssertionError("Screenshot encoding failed");
+            try(FileOutputStream out=new FileOutputStream(new File(getTargetContext().getCacheDir(),name))){out.write(data.toByteArray());out.flush();out.getFD().sync();}
+        }finally{bitmap.recycle();}
+    }
     private void require(boolean valid, String message) { if (!valid) throw new AssertionError(message); }
     @Override public void onStart() {
         Bundle status = new Bundle();
@@ -81,15 +89,15 @@ public class OfflineSmokeRunner extends Instrumentation {
             require("true".equals(js(app,"!EJS_emulator.elements.menuToggle.isConnected && !el('pref-accent') && el('pref-theme').options.length>=10")),"Legacy menu or split themes still present");
             js(app,"settings.shortcut=true;settings.saveShortcut=true;apply();toggleSettings(false)");
             require("true".equals(js(app,"!el('save-shortcut').hidden && !!el('save-shortcut').querySelector('svg') && !!el('restore-shortcut').querySelector('svg') && getComputedStyle(el('reopen')).display==='grid'")),"Save/restore shortcuts or centered icons missing");
-            js(app,"window.originalA=buttons.A.getBoundingClientRect().width;window.originalB=buttons.B.getBoundingClientRect().width;startEditing();selectControl('A');resizeInput.value=160;resizeInput.dispatchEvent(new Event('input'));finishEditing()");
+            js(app,"window.originalA=buttons.A.getBoundingClientRect().width;window.originalB=buttons.B.getBoundingClientRect().width;startEditing();selectControl('A');resizeInput.value=160;resizeInput.dispatchEvent(new Event('input'))");
+            Thread.sleep(250);capture("editor.png");js(app,"finishEditing()");
             require("true".equals(js(app,"Math.abs(buttons.A.getBoundingClientRect().width/originalA-1.6)<.05 && Math.abs(buttons.B.getBoundingClientRect().width-originalB)<1 && read(profileKey,{}).sizes.A===160")),"Individual button size or persistence failed");
             js(app,"startEditing();selectControl('reopen');resizeInput.value=130;resizeInput.dispatchEvent(new Event('input'));finishEditing();settings.theme='dourado';apply();persist()");
             require("true".equals(js(app,"document.documentElement.dataset.theme==='dourado' && read('fire-game-theme','')==='dourado' && getComputedStyle(buttons.A).backgroundColor===getComputedStyle(el('save-point')).backgroundColor && scaleFor('reopen')===1.3")),"Unified theme or shortcut scaling failed");
             js(app,"settings.screen='full';settings.fit='fill';settings.orientation='horizontal';apply();persist()");
             waitJs(app,"innerWidth>innerHeight && Math.abs(el('game').getBoundingClientRect().width-innerWidth)<2 && Math.abs(el('game').getBoundingClientRect().height-innerHeight)<2");
             Thread.sleep(700);
-            android.graphics.Bitmap wide=getUiAutomation().takeScreenshot();
-            try(FileOutputStream image=new FileOutputStream(new File(getTargetContext().getCacheDir(),"controls-wide.png"))){wide.compress(android.graphics.Bitmap.CompressFormat.PNG,100,image);}wide.recycle();
+            capture("controls-wide.png");
             js(app,"settings.screen='console';settings.fit='contain';settings.orientation='vertical';apply();persist();el('save-shortcut').click()");
             // The new on-screen save shortcut creates a checkpoint.
 

@@ -102,7 +102,13 @@ const editorSelect=make('select');editorSelect.id='edit-target';editorSelect.set
 const resizeLabel=make('label','Tamanho individual');resizeLabel.htmlFor='edit-size';
 const resizeValue=make('output','100%');resizeValue.id='edit-size-value';resizeLabel.append(resizeValue);
 const resizeInput=make('input');resizeInput.id='edit-size';resizeInput.type='range';resizeInput.min=60;resizeInput.max=200;resizeInput.step=5;
-editor.append(editorHead,make('small','Toque em um botão para selecionar. Arraste para mover.'),editorSelect,resizeLabel,resizeInput);document.body.append(editor);
+editor.append(editorHead,make('small','Toque no botão para editar. Arraste o título para mover este painel.'),editorSelect,resizeLabel,resizeInput);document.body.append(editor);
+// The editor itself can move so no gameplay control becomes unreachable.
+let editorDrag=null;
+editorHead.style.touchAction='none';editorHead.style.cursor='grab';editorHead.title='Arraste para mover o painel';
+editorHead.onpointerdown=event=>{if(event.target.closest('button'))return;event.preventDefault();const r=editor.getBoundingClientRect();editorDrag=[event.clientX-r.left,event.clientY-r.top];editorHead.setPointerCapture(event.pointerId);};
+editorHead.onpointermove=event=>{if(!editorDrag||!editorHead.hasPointerCapture(event.pointerId))return;const r=editor.getBoundingClientRect();editor.style.left=Math.max(4,Math.min(innerWidth-r.width-4,event.clientX-editorDrag[0]))+'px';editor.style.top=Math.max(4,Math.min(innerHeight-r.height-4,event.clientY-editorDrag[1]))+'px';editor.style.bottom='auto';editor.style.transform='none';};
+editorHead.onlostpointercapture=()=>{editorDrag=null;};
 let selectedControl='A';
 const controlNames={D:'Direcional',A:'Botão A',B:'Botão B',L:'Botão L',R:'Botão R',Select:'Select',Start:'Start','speed-button':'Velocidade','reopen':'Configurações','restore-shortcut':'Voltar ao save','save-shortcut':'Salvar jogo'};
 function scaleFor(id){const value=Number(settings.sizes[id]);return Math.max(.6,Math.min(2,Number.isFinite(value)&&value?value/100:1));}
@@ -110,7 +116,7 @@ function selectedElement(){return buttons[selectedControl]||el(selectedControl);
 function selectControl(id){selectedControl=id;editorSelect.value=id;resizeInput.value=Math.round(scaleFor(id)*100);resizeValue.value=resizeInput.value+'%';resizeValue.textContent=resizeInput.value+'%';resizeInput.setAttribute('aria-label','Tamanho de '+controlNames[id]);document.querySelectorAll('.selected-control').forEach(b=>b.classList.remove('selected-control'));selectedElement()?.classList.add('selected-control');}
 function startEditing(){
  const box=el('show-controls');if(!box.checked)box.click();for(const pointer of [...held.keys()])inputs(pointer,[]);
- editing=true;document.body.classList.add('editing');toggleSettings(false);editor.hidden=false;editorSelect.replaceChildren();
+ editing=true;document.body.classList.add('editing');toggleSettings(false);editor.removeAttribute('style');editor.hidden=false;editorSelect.replaceChildren();
  for(const id of [...ids,...floats.filter(b=>!b.hidden).map(b=>b.id)]){const option=make('option',controlNames[id]);option.value=id;editorSelect.append(option);}
  for(const button of floats)if(!button.hidden)button.disabled=false;
  selectControl(editorSelect.querySelector('option[value="'+selectedControl+'"]')?selectedControl:'A');say('Selecione, mova e ajuste o tamanho de cada botão');
