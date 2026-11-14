@@ -129,7 +129,7 @@ public class MainActivity extends Activity {
             });
         }
         @JavascriptInterface public void orientation(int value) {
-            runOnUiThread(() -> { if (PLAY.equals(web.getUrl())) setRequestedOrientation(value == 1 ? ActivityInfo.SCREEN_ORIENTATION_PORTRAIT : value == 2 ? ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE : ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED); });
+            runOnUiThread(() -> { if (playing) setRequestedOrientation(value == 1 ? ActivityInfo.SCREEN_ORIENTATION_PORTRAIT : value == 2 ? ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE : ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED); });
         }
         @JavascriptInterface public void immersive(boolean value) {
             runOnUiThread(() -> getWindow().getDecorView().setSystemUiVisibility(value ? 5894 : 0));
@@ -181,7 +181,7 @@ public class MainActivity extends Activity {
         @JavascriptInterface public void play() {
             runOnUiThread(() -> { if (!importing && new File(getFilesDir(), "game.gba").isFile()) openGame(); });
         }
-        @JavascriptInterface public void home() { runOnUiThread(() -> { setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT); immersive(false); web.loadUrl(HOME); }); }
+        @JavascriptInterface public void home() { runOnUiThread(() -> { playing = false; setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT); immersive(false); web.loadUrl(HOME); }); }
         @JavascriptInterface public boolean saveFiles(String json) {
             try {
                 if (json.length() > 64 * 1024 * 1024) return false;
@@ -399,7 +399,9 @@ public class MainActivity extends Activity {
         if(total>=192 && total<=32*1024*1024 && (header[0xb2]&255)==0x96) return "gba";
         throw new IOException("Arquivo inválido. Selecione uma ROM GBA ou Nintendo DS.");
     }
+    private volatile boolean playing;
     private void openGame() {
+        playing = true;
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
         web.loadUrl(PLAY);
     }
