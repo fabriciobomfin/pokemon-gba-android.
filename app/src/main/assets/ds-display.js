@@ -31,7 +31,11 @@ function forwardDSTouch(event,type){
  const canvas=emulator()?.canvas;if(!canvas)return;
  const r=dsPreview.getBoundingClientRect(),target=canvas.getBoundingClientRect();
  const x=Math.max(0,Math.min(1,(event.clientX-r.left)/r.width)),y=Math.max(0,Math.min(1,(event.clientY-r.top)/r.height));
- const touch=new Touch({identifier:77,target:canvas,clientX:target.left+x*target.width,clientY:target.top+(0.5+y/2)*target.height});
+ // rwebinput consumes target coordinates multiplied by devicePixelRatio,
+ // not the CSS-scaled rectangle used to enlarge/crop the screen.
+ const clientX=target.left+x*canvas.width/devicePixelRatio,clientY=target.top+(0.5+y/2)*canvas.height/devicePixelRatio;
+ const touch=new Touch({identifier:77,target:canvas,clientX,clientY,pageX:clientX+scrollX,pageY:clientY+scrollY,screenX:clientX,screenY:clientY});
+ window.dsLastTouch={type,clientX,clientY,buffer:[canvas.width,canvas.height],rect:[target.left,target.top,target.width,target.height]};
  const active=type==='touchend'?[]:[touch];
  canvas.dispatchEvent(new TouchEvent(type,{bubbles:true,cancelable:true,touches:active,targetTouches:active,changedTouches:[touch]}));
 }

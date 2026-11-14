@@ -80,6 +80,7 @@ public class MainActivity extends Activity {
             }
         });
         web.addJavascriptInterface(new Bridge(), "Android");
+        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
         web.loadUrl(HOME);
     }
 
@@ -128,7 +129,7 @@ public class MainActivity extends Activity {
             });
         }
         @JavascriptInterface public void orientation(int value) {
-            runOnUiThread(() -> setRequestedOrientation(value == 1 ? ActivityInfo.SCREEN_ORIENTATION_PORTRAIT : value == 2 ? ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE : ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED));
+            runOnUiThread(() -> { if (PLAY.equals(web.getUrl())) setRequestedOrientation(value == 1 ? ActivityInfo.SCREEN_ORIENTATION_PORTRAIT : value == 2 ? ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE : ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED); });
         }
         @JavascriptInterface public void immersive(boolean value) {
             runOnUiThread(() -> getWindow().getDecorView().setSystemUiVisibility(value ? 5894 : 0));
@@ -180,7 +181,7 @@ public class MainActivity extends Activity {
         @JavascriptInterface public void play() {
             runOnUiThread(() -> { if (!importing && new File(getFilesDir(), "game.gba").isFile()) openGame(); });
         }
-        @JavascriptInterface public void home() { runOnUiThread(() -> { orientation(0); immersive(false); web.loadUrl(HOME); }); }
+        @JavascriptInterface public void home() { runOnUiThread(() -> { setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT); immersive(false); web.loadUrl(HOME); }); }
         @JavascriptInterface public boolean saveFiles(String json) {
             try {
                 if (json.length() > 64 * 1024 * 1024) return false;

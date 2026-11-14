@@ -80,3 +80,5 @@ Não adicione jogos, BIOS nem saves pessoais ao git. Eles estão ignorados, e o 
 - Tela e vídeo mantém a opção tradicional de duas telas lado a lado / empilhadas. Modo, tela selecionada, tamanho e posição são salvos por jogo.
 - Não existe detecção automática de pedidos de interação: o núcleo não fornece um sinal confiável para isso.
 - Mesmo identificador e certificado permanente da 3.1; versionCode 15. Instalar por cima da 3.1 sem apagar dados.
+
+- A biblioteca abre e retorna sempre na vertical; jogos começam na horizontal e mantêm a opção de orientação nas configurações.

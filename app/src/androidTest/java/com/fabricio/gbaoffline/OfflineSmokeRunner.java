@@ -85,7 +85,7 @@ public class OfflineSmokeRunner extends Instrumentation {
         float x=(float)point.getDouble("x")+origin[0],y=(float)point.getDouble("y")+origin[1];
         long now=android.os.SystemClock.uptimeMillis();
         android.view.MotionEvent event=android.view.MotionEvent.obtain(now,now,0,x,y,0);event.setSource(android.view.InputDevice.SOURCE_TOUCHSCREEN);getUiAutomation().injectInputEvent(event,true);event.recycle();
-        Thread.sleep(800);expectDsColors(0,1);
+        Thread.sleep(800);android.util.Log.i("FireGameDSTouch",js(app,"JSON.stringify({touch:window.dsLastTouch,errors:window.runtimeErrors})"));expectDsColors(0,1);
         event=android.view.MotionEvent.obtain(now,android.os.SystemClock.uptimeMillis(),1,x,y,0);event.setSource(android.view.InputDevice.SOURCE_TOUCHSCREEN);getUiAutomation().injectInputEvent(event,true);event.recycle();
         Thread.sleep(500);expectDsColors(0,2);
     }
@@ -131,7 +131,7 @@ public class OfflineSmokeRunner extends Instrumentation {
         js(app,"EJS_emulator.gameManager.simulateInput(0,8,0)");
         waitJs(app,"Object.entries(JSON.parse(Android.loadFiles())).some(([key,value])=>key.endsWith('.dsv')&&atob(value).charCodeAt(0)===90)");
         js(app,"leaveGame()");
-        waitJs(app,"!!el('nds-count')");
+        waitJs(app,"!!el('nds-count') && innerHeight>innerWidth");
         require("true".equals(js(app,"el('nds-count').textContent==='1 jogo' && el('game-count').textContent==='1 jogo'")),"Mixed-console library counts incorrect");
         require("true".equals(js(app,"el('nds-category').click();el('list').querySelectorAll('article').length===1 && el('list').innerText.includes('Nintendo DS')")),"DS category failed");
         // Full-size DS checkpoints must survive the same export used by the app.
@@ -158,7 +158,7 @@ public class OfflineSmokeRunner extends Instrumentation {
             Intent launch = new Intent(getTargetContext(), MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             activity = (MainActivity)startActivitySync(launch);
             final MainActivity app = activity;
-            waitJs(app, "typeof Android!=='undefined' && !!document.getElementById('import')");
+            waitJs(app, "typeof Android!=='undefined' && !!document.getElementById('import') && innerHeight>innerWidth");
             if(phase.startsWith("upgrade-")){
                 if("upgrade-seed".equals(phase)){
                     String preserved=js(app,"JSON.stringify({library:JSON.parse(Android.library()),theme:read('fire-game-theme',null),profiles:Object.keys(localStorage).filter(k=>k.startsWith('pocket:')).sort().map(k=>[k,localStorage.getItem(k)])})");
