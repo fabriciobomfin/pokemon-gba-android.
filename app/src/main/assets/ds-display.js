@@ -40,7 +40,7 @@ function positionDSWindow(){
  const width=Math.max(112,Math.min(innerWidth*.48,innerWidth*(settings.dsWindowSize||28)/100,260));
  dsWindow.style.width=width+'px';
  const height=width*.75+30,pos=settings.dsWindowPosition;
- const x=pos?innerWidth*pos[0]/100:innerWidth-width-16,y=pos?innerHeight*pos[1]/100:72;
+ const x=pos?innerWidth*pos[0]/100:innerWidth-width-(landscape.matches?innerWidth*.2:16),y=pos?innerHeight*pos[1]/100:72;
  dsWindow.style.left=Math.max(4,Math.min(innerWidth-width-4,x))+'px';
  dsWindow.style.top=Math.max(4,Math.min(innerHeight-height-4,y))+'px';
 }
@@ -62,7 +62,7 @@ function applyDSDisplay(){
  dsWindow.hidden=mode!=='overlay';el('ds-window-label').textContent=bottom?'Tela superior':'Tela inferior · toque';
  dsPreview.setAttribute('aria-label',bottom?'Tela superior do DS':'Tela inferior sensível ao toque');
  const e=emulator(),canvas=e?.canvas;if(!e?.started||!canvas)return;
- const layout=mode==='dual'?(landscape.matches?'left/right':'top/bottom'):mode==='overlay'?'top/bottom':bottom?'bottom only':'top only';
+ const layout=mode==='dual'?(landscape.matches?(bottom?'right/left':'left/right'):(bottom?'bottom/top':'top/bottom')):mode==='overlay'?'top/bottom':bottom?'bottom only':'top only';
  if(dsLayout!==layout){releaseDSTouch();e.gameManager.setVariable('desmume_screens_layout',layout);dsLayout=layout;}
  e.gameManager.setVariable('desmume_pointer_type','touch');
  for(const [key,value] of Object.entries({position:'absolute',left:'0px',top:'0px',width:'100%',height:'100%',transform:'none','clip-path':'none','object-fit':'contain','max-width':'none','max-height':'none'}))canvas.style.setProperty(key,value,'important');

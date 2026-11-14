@@ -270,7 +270,9 @@ public class OfflineSmokeRunner extends Instrumentation {
             require("true".equals(js(app,"document.documentElement.dataset.theme==='dourado' && read('fire-game-theme','')==='dourado' && getComputedStyle(buttons.A).backgroundColor===getComputedStyle(el('save-point')).backgroundColor && scaleFor('reopen')===1.3")),"Unified theme or shortcut scaling failed");
             js(app,"settings.screen='full';settings.fit='fill';settings.orientation='horizontal';apply();persist()");
             waitJs(app,"innerWidth>innerHeight && Math.abs(el('game').getBoundingClientRect().width-innerWidth)<2 && Math.abs(el('game').getBoundingClientRect().height-innerHeight)<2");
-            js(app,"EJS_emulator.pause();updateCanvasCrop()");Thread.sleep(1800);
+            Thread.sleep(1200);js(app,"window.layoutFrame=EJS_emulator.gameManager.getFrameNum()");
+            waitJs(app,"EJS_emulator.gameManager.getFrameNum()>window.layoutFrame+3");
+            js(app,"EJS_emulator.pause();updateCanvasCrop()");Thread.sleep(300);
             android.util.Log.i("FireGameLayout",js(app,"JSON.stringify({window:[innerWidth,innerHeight],game:el('game').getBoundingClientRect().toJSON(),canvas:EJS_emulator.canvas.getBoundingClientRect().toJSON(),buffer:[EJS_emulator.canvas.width,EJS_emulator.canvas.height],aspect:EJS_emulator.gameManager.getVideoDimensions('aspect'),fit:document.body.dataset.fit,screen:document.body.dataset.screen})"));
             capture("controls-wide.png");
             android.graphics.Bitmap filled=getUiAutomation().takeScreenshot();
