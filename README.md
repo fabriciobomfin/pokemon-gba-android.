@@ -31,3 +31,13 @@ A instrumentação Android importa um programa homebrew original de 256 bytes, e
 - [mGBA](https://github.com/EmulatorJS/mgba): Mozilla Public License 2.0.
 
 Não adicione jogos, BIOS nem saves pessoais ao git. Eles estão ignorados, e o CI também rejeita APKs com arquivos de ROM.
+
+
+## Fire Game 2.6 — personalização
+
+- Menu redundante do EmulatorJS removido; atalhos de configurações, velocidade, salvar e voltar ao save usam dimensões e ícones consistentes.
+- Em **Controles → Mover e redimensionar botões**, toque no controle ou escolha-o na lista e ajuste seu tamanho individual (60–200%). Posições por orientação e tamanhos são mantidos ao reabrir.
+- Ative **Salvar jogo na tela** e/ou **Voltar ao save na tela** em Controles.
+- Em **Tela e vídeo → Área do jogo**, alterne entre o console e o jogo em toda a tela, com controles sobre a imagem. O enquadramento oferece proporção original, corte e esticamento.
+- Onze temas completos incluem Roxo, Ciano, Dourado, Azul oceano, Rosa, Rubi e Grafite, além dos anteriores. Texto, console, botões e biblioteca usam a mesma paleta.
+- Esta edição usa `com.fabricio.firegame.controls` para instalar ao lado das versões anteriores. Exporte o backup pelo Fire Game 2.5 e importe nesta edição depois de selecionar a mesma ROM; isso transfere o histórico de checkpoints e os saves do cartucho sem apagar a instalação anterior.

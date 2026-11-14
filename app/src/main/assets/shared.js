@@ -26,3 +26,25 @@ function sectionIcon(name) {
  svg.setAttribute('class','section-icon');svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('aria-hidden','true');svg.setAttribute('focusable','false');
  path.setAttribute('d',iconPaths[name]);svg.append(path);return svg;
 }
+
+// One palette controls the whole interface, including text and console buttons.
+const themes={
+ ameixa:{name:'Ameixa',colors:['#120f1e','#251d37','#514263','#fff0d7','#c8b9d2','#ffbd76','#28172a']},
+ noite:{name:'Meia-noite',colors:['#080d19','#182438','#364a68','#edf4ff','#a9bcd6','#91bfff','#11253e']},
+ roxo:{name:'Roxo',colors:['#130d22','#291b42','#634786','#f5ecff','#c8b4df','#c59aff','#28153f']},
+ ciano:{name:'Ciano',colors:['#071b20','#10343d','#2d6370','#e2fbff','#a4cbd3','#68e4ee','#072a30']},
+ dourado:{name:'Dourado',colors:['#19150c','#302817','#6c5931','#fff3d5','#d0bd92','#f6c861','#2c210a']},
+ azul:{name:'Azul oceano',colors:['#081727','#132d49','#315a82','#edf6ff','#adc5df','#70b9ff','#102b48']},
+ jade:{name:'Jade',colors:['#0b1d18','#18382c','#39634c','#eaf9e9','#b1cdb5','#8fe2ad','#132f21']},
+ brasa:{name:'Brasa',colors:['#23120e','#3e231a','#80503a','#fff1df','#ddbda7','#ffab70','#341b0c']},
+ rubi:{name:'Rubi',colors:['#240f19','#401d2b','#814258','#fff0f2','#d6b2bd','#ff91ad','#3d1321']},
+ rosa:{name:'Rosa',colors:['#21121f','#3a2338','#75536f','#fff0fb','#d4bad0','#f6a7d6','#381b2d']},
+ grafite:{name:'Grafite',colors:['#14171c','#272d35','#515c69','#f0f3f7','#bbc4d0','#becbdd','#1c2735']}
+};
+function applyTheme(name){
+ const theme=themes[name]||themes.ameixa;
+ ['--base','--panel','--line','--paper','--muted','--accent','--on-accent'].forEach((key,i)=>document.documentElement.style.setProperty(key,theme.colors[i]));
+ document.documentElement.style.setProperty('--mint',theme.colors[5]);document.documentElement.style.setProperty('--ink',theme.colors[3]);
+ document.documentElement.dataset.theme=themes[name]?name:'ameixa';
+}
+applyTheme(read('fire-game-theme','ameixa'));

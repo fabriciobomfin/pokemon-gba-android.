@@ -1,6 +1,10 @@
 const deck=el('console'),panel=el('settings-panel'),profileKey='pocket:'+rom.id;
-const defaults={skin:'round',accent:'tema',focus:true,theme:'ameixa',orientation:'auto',preset:'classic',volume:75,filter:'original',brightness:100,saturation:100,fit:'contain',speed:'1',interval:5,positions:{},haptic:true};
+const defaults={skin:'round',accent:'tema',focus:true,theme:'ameixa',orientation:'auto',preset:'classic',volume:75,filter:'original',brightness:100,saturation:100,fit:'contain',speed:'1',interval:5,positions:{},sizes:{},screen:'console',haptic:true};
 let settings=Object.assign({},defaults,read(profileKey,{})),editing=false,activeSeconds=0;
+settings.positions=settings.positions||{};settings.sizes=settings.sizes||{};
+settings.theme=read('fire-game-theme',settings.theme);delete settings.accent;
+// Older floating shortcuts had unrelated positions; align just those once.
+if(settings.toolsVersion!==2){for(const layout of Object.values(settings.positions))for(const id of ['reopen','speed-button','restore-shortcut','save-shortcut'])delete layout[id];settings.toolsVersion=2;persist();}
 const emulator=()=>window.EJS_emulator;
 const say=text=>{el('status').textContent=text};
 function persist(){write(profileKey,settings)}
@@ -59,7 +63,7 @@ const allButton=action("Todos os saves",historyView);allButton.id="all-points";q
 let hasCheckpoint=false,checkpointBusy=false;
 function refreshCheckpoint(){
  saveButton.disabled=checkpointBusy||!emulator()?.started;
- loadButton.disabled=saveButton.disabled||!hasCheckpoint;const shortcut=el('restore-shortcut');if(shortcut)shortcut.disabled=loadButton.disabled;
+ loadButton.disabled=saveButton.disabled||!hasCheckpoint;const shortcut=el('restore-shortcut');if(shortcut)shortcut.disabled=loadButton.disabled;const saveShortcut=el('save-shortcut');if(saveShortcut)saveShortcut.disabled=saveButton.disabled;
 }
 async function useCheckpoint(saving,key){
  const e=emulator();
@@ -90,26 +94,49 @@ checkpoint().then(point=>{
 }).catch(()=>{feedback.textContent='Armazenamento de saves indisponível.'});
 const restart=action('Reiniciar',()=>{const e=emulator();if(e?.started&&confirm('Reiniciar o jogo agora?')){saveGame(false);e.gameManager.restart();toggleSettings(false)}});
 const library=action('Biblioteca',()=>leaveGame());
-const move=action('Mover controles',()=>{const box=el('show-controls');if(!box.checked)box.click();editing=true;document.body.classList.add('editing');toggleSettings(false);editDone.hidden=false;say('Arraste os controles e toque em Concluir')});
-const editDone=action('Concluir',()=>{editing=false;document.body.classList.remove('editing');editDone.hidden=true;persist();say('Posições salvas')});editDone.style.cssText='position:absolute;z-index:23;top:2px;left:42%';editDone.hidden=true;document.body.append(editDone);
+const move=action('Mover e redimensionar botões',()=>startEditing());move.id='edit-controls';
+const editor=make('section');editor.id='layout-editor';editor.hidden=true;editor.setAttribute('aria-label','Editor dos botões');
+const editorHead=make('div');editorHead.className='editor-head';editorHead.append(make('strong','Editar botões'));
+const editDone=action('Concluir',()=>finishEditing());editDone.id='edit-done';editorHead.append(editDone);
+const editorSelect=make('select');editorSelect.id='edit-target';editorSelect.setAttribute('aria-label','Botão selecionado');
+const resizeLabel=make('label','Tamanho individual');resizeLabel.htmlFor='edit-size';
+const resizeValue=make('output','100%');resizeValue.id='edit-size-value';resizeLabel.append(resizeValue);
+const resizeInput=make('input');resizeInput.id='edit-size';resizeInput.type='range';resizeInput.min=60;resizeInput.max=200;resizeInput.step=5;
+editor.append(editorHead,make('small','Toque em um botão para selecionar. Arraste para mover.'),editorSelect,resizeLabel,resizeInput);document.body.append(editor);
+let selectedControl='A';
+const controlNames={D:'Direcional',A:'Botão A',B:'Botão B',L:'Botão L',R:'Botão R',Select:'Select',Start:'Start','speed-button':'Velocidade','reopen':'Configurações','restore-shortcut':'Voltar ao save','save-shortcut':'Salvar jogo'};
+function scaleFor(id){const value=Number(settings.sizes[id]);return Math.max(.6,Math.min(2,Number.isFinite(value)&&value?value/100:1));}
+function selectedElement(){return buttons[selectedControl]||el(selectedControl);}
+function selectControl(id){selectedControl=id;editorSelect.value=id;resizeInput.value=Math.round(scaleFor(id)*100);resizeValue.value=resizeInput.value+'%';resizeValue.textContent=resizeInput.value+'%';resizeInput.setAttribute('aria-label','Tamanho de '+controlNames[id]);document.querySelectorAll('.selected-control').forEach(b=>b.classList.remove('selected-control'));selectedElement()?.classList.add('selected-control');}
+function startEditing(){
+ const box=el('show-controls');if(!box.checked)box.click();for(const pointer of [...held.keys()])inputs(pointer,[]);
+ editing=true;document.body.classList.add('editing');toggleSettings(false);editor.hidden=false;editorSelect.replaceChildren();
+ for(const id of [...ids,...floats.filter(b=>!b.hidden).map(b=>b.id)]){const option=make('option',controlNames[id]);option.value=id;editorSelect.append(option);}
+ for(const button of floats)if(!button.hidden)button.disabled=false;
+ selectControl(editorSelect.querySelector('option[value="'+selectedControl+'"]')?selectedControl:'A');say('Selecione, mova e ajuste o tamanho de cada botão');
+}
+function finishEditing(){editing=false;document.body.classList.remove('editing');editor.hidden=true;document.querySelectorAll('.selected-control').forEach(b=>b.classList.remove('selected-control'));persist();refreshCheckpoint();say('Posições e tamanhos salvos');}
+editorSelect.onchange=()=>selectControl(editorSelect.value);
+resizeInput.oninput=()=>{settings.sizes[selectedControl]=Number(resizeInput.value);persist();selectControl(selectedControl);place();};
 const choices=(...items)=>items.map(item=>item.split('|'));
-setting('shortcut','Botão Voltar ao save na tela',[],'checkbox');
+setting('shortcut','Voltar ao save na tela',[],'checkbox');
+setting('saveShortcut','Salvar jogo na tela',[],'checkbox');
 setting('skin','Design do controle',choices('round|Disco','cross|Cruz clássica','arcade|Arcade'));
-setting('accent','Cor dos botões',choices('tema|Do tema','#ff756d|Coral','#80bfff|Azul','#ce96ff|Violeta','#89df93|Verde','#ffcc61|Dourado','#ffffff|Branco'));
 setting('preset','Posição dos botões',choices('classic|Clássica','left|Canhoto','compact|Compacta'));
-setting('theme','Cor do console',choices('ameixa|Ameixa','brasa|Brasa','jade|Jade','noite|Meia-noite'));
+setting('theme','Tema completo',Object.entries(themes).map(([id,theme])=>[id,theme.name]));
 setting('orientation','Orientação',choices('auto|Automática','vertical|Em pé','horizontal|Deitado'));
+setting('screen','Área do jogo',choices('console|Console · espaço para controles','full|Tela inteira · controles sobre o jogo'));
 setting('fit','Enquadramento',choices('contain|Proporção original','cover|Preencher com corte','fill|Esticar'));
 setting('filter','Imagem',choices('original|Original','lcd|LCD','crt|CRT','mono|Monocromática','warm|Quente'));
 setting('brightness','Brilho da imagem',[50,150,5],'range');setting('saturation','Intensidade das cores',[0,170,5],'range');
 setting('volume','Volume',[0,100,5],'range');
 setting('interval','Intervalo de gravação',choices('5|5 segundos','15|15 segundos','30|30 segundos'));
-for(const [key,label] of Object.entries({mute:'Silenciar áudio',focus:'Tela cheia',haptic:'Vibração dos botões',contrast:'Alto contraste',bigtext:'Texto ampliado no menu',clock:'Relógio no cabeçalho',timer:'Tempo da sessão',swap:'Trocar A e B',diagonal:'Permitir diagonais no direcional'})){
+for(const [key,label] of Object.entries({mute:'Silenciar áudio',focus:'Ocultar cabeçalho e barras',haptic:'Vibração dos botões',contrast:'Alto contraste',bigtext:'Texto ampliado no menu',clock:'Relógio no cabeçalho',timer:'Tempo da sessão',swap:'Trocar A e B',diagonal:'Permitir diagonais no direcional'})){
  if(key==='diagonal'&&settings[key]===undefined)settings[key]=false;setting(key,label,[],'checkbox')
 }
 const clock=make('span');clock.id='timer';el('app-header').querySelector('.brand-line').append(clock);
 el('reopen').onclick=()=>toggleSettings(true);
-const reset=action('Restaurar posições',()=>{settings.positions={};persist();place()});
+const reset=action('Restaurar posições e tamanhos',()=>{settings.positions={};settings.sizes={};persist();place()});
 function addCategory(title, icon, fields, actions=[]) {
  const group=make('details');group.className='category';
  const summary=make('summary',title);summary.prepend(sectionIcon(icon));group.append(summary);panel.append(group);
@@ -124,35 +151,39 @@ for(const id of ['reopen','settings-toggle']){
  button.setAttribute('aria-label','Configurações do jogo');
  button.setAttribute('aria-controls','settings-panel');button.setAttribute('aria-expanded','false');
 }
-addCategory('Vídeo','screen',['pref-focus','pref-orientation','pref-fit','pref-filter','sharp-image','pref-brightness','pref-saturation']);
+addCategory('Tela e vídeo','screen',['pref-screen','pref-focus','pref-orientation','pref-fit','pref-filter','sharp-image','pref-brightness','pref-saturation']);
 addCategory('Áudio','sound',['pref-volume','pref-mute']);
-addCategory('Controles','controller',['pref-shortcut','pref-skin','pref-preset','control-size','control-opacity','show-controls','pref-haptic','pref-swap','pref-diagonal'],[move,reset]);
-addCategory('Aparência e acessibilidade','palette',['pref-theme','pref-accent','pref-contrast','pref-bigtext']);
+addCategory('Controles','controller',['pref-shortcut','pref-saveShortcut','pref-skin','pref-preset','control-size','control-opacity','show-controls','pref-haptic','pref-swap','pref-diagonal'],[move,reset]);
+addCategory('Aparência e acessibilidade','palette',['pref-theme','pref-contrast','pref-bigtext']);
 addCategory('Avançado','sliders',['pref-interval','pref-clock','pref-timer'],[library,restart]);
 const speedButton=el('speed-button');
-const restoreShortcut=action('↶',()=>useCheckpoint(false));restoreShortcut.id='restore-shortcut';restoreShortcut.setAttribute('aria-label','Voltar ao save');document.body.append(restoreShortcut);
-const floats=[speedButton,el('reopen'),restoreShortcut];
+const restoreShortcut=action('',()=>useCheckpoint(false));restoreShortcut.append(sectionIcon('restore'));restoreShortcut.id='restore-shortcut';restoreShortcut.setAttribute('aria-label','Voltar ao save');document.body.append(restoreShortcut);
+const saveShortcut=action('',()=>useCheckpoint(true));saveShortcut.id='save-shortcut';saveShortcut.append(sectionIcon('backup'));saveShortcut.setAttribute('aria-label','Salvar jogo');document.body.append(saveShortcut);
+const floats=[el('reopen'),speedButton,restoreShortcut,saveShortcut];
 function placeTools(){
  floats.forEach((b,i)=>{
   const pos=settings.positions[keyLayout()]?.[b.id];
-  const x=pos?innerWidth*pos[0]/100:innerWidth/2+[-27,27,81][i];
-  const y=pos?innerHeight*pos[1]/100:27;
-  b.style.setProperty('left',Math.max(26,Math.min(innerWidth-26,x))+'px','important');
-  b.style.setProperty('top',Math.max(24,Math.min(innerHeight-24,y))+'px','important');
+  const scale=scaleFor(b.id),margin=26*scale;
+  b.style.setProperty('--button-scale',scale);
+  const x=pos?innerWidth*pos[0]/100:innerWidth-32-i*54;
+  const y=pos?innerHeight*pos[1]/100:32;
+  b.style.setProperty('left',Math.max(margin,Math.min(innerWidth-margin,x))+'px','important');
+  b.style.setProperty('top',Math.max(margin,Math.min(innerHeight-margin,y))+'px','important');
  });
 }
 for(const b of floats){
  b.classList.add('floating-tool');
  b.addEventListener('click',e=>{if(editing){e.preventDefault();e.stopImmediatePropagation()}},true);
- b.onpointerdown=e=>{if(editing)b.setPointerCapture(e.pointerId)};
+ b.onpointerdown=e=>{if(editing){selectControl(b.id);b.setPointerCapture(e.pointerId)}};
+ b.onlostpointercapture=()=>{if(editing)persist()};
  b.onpointermove=e=>{if(!editing||!b.hasPointerCapture(e.pointerId))return;
  const group=settings.positions[keyLayout()]||(settings.positions[keyLayout()]={});
  group[b.id]=[100*e.clientX/innerWidth,100*e.clientY/innerHeight];placeTools()};
 }
 function updateSpeed(){
- restoreShortcut.hidden=!settings.shortcut;document.body.dataset.skin=settings.skin;
+ restoreShortcut.hidden=!settings.shortcut;saveShortcut.hidden=!settings.saveShortcut;document.body.dataset.skin=settings.skin;
  document.body.dataset.fit=settings.fit;
- if(settings.accent!=='tema')document.documentElement.style.setProperty('--accent',settings.accent);
+
  const speed=Number(settings.speed);
  speedButton.textContent=speed+'×';
  speedButton.setAttribute('aria-label','Velocidade '+speed+'×. Toque para mudar.');
@@ -169,7 +200,7 @@ function place(){
  placeTools();
  let points=landscape.matches?[[10,56],[94,52],[85,68],[9,16],[91,16],[7,88],[93,88]]:[[22,52],[85,43],[69,58],[16,16],[84,16],[40,83],[60,83]];
  ids.forEach((id,i)=>{let [x,y]=points[i];if(settings.preset==='left')x=100-x;if(settings.preset==='compact'){y=50+(y-50)*.78;x=x<50?x+2:x-2}
- const saved=settings.positions[keyLayout()]?.[id];if(saved)[x,y]=saved;const b=buttons[id],rect=deck.getBoundingClientRect(),scale=Number(el('control-size').value)/100;
+ const saved=settings.positions[keyLayout()]?.[id];if(saved)[x,y]=saved;const b=buttons[id],rect=deck.getBoundingClientRect(),scale=Number(el('control-size').value)/100*scaleFor(id);b.style.setProperty('--button-scale',scaleFor(id));
  const limit=(v,size,dim)=>dim?Math.max(size*50/dim,Math.min(100-size*50/dim,v)):v;
  b.style.left=limit(x,b.offsetWidth*scale,rect.width)+'%';b.style.top=limit(y,b.offsetHeight*scale,rect.height)+'%';
  })
@@ -188,7 +219,7 @@ for(const id of ids){const b=make('button',id==='D'?'':id);b.className='pad '+(i
   }
  }
  function update(event){
- if(editing){const r=deck.getBoundingClientRect(),group=settings.positions[keyLayout()]||(settings.positions[keyLayout()]={});group[id]=[100*(event.clientX-r.left)/r.width,100*(event.clientY-r.top)/r.height];place();return}
+ if(editing){selectControl(id);const r=deck.getBoundingClientRect(),group=settings.positions[keyLayout()]||(settings.positions[keyLayout()]={});group[id]=[100*(event.clientX-r.left)/r.width,100*(event.clientY-r.top)/r.height];place();return}
  if(!emulator()?.started)return;
  if(id!=='D'){inputs(event.pointerId,[codes[settings.swap&&id==='A'?'B':settings.swap&&id==='B'?'A':id]]);return}
  const r=b.getBoundingClientRect(),x=(event.clientX-r.left)/r.width-.5,y=(event.clientY-r.top)/r.height-.5;
@@ -202,8 +233,7 @@ for(const id of ids){const b=make('button',id==='D'?'':id);b.className='pad '+(i
  b.onlostpointercapture=e=>{inputs(e.pointerId,[]);b.classList.remove('pressed');for(const mark of b.children)mark.classList.remove('lit');if(editing)persist()}
 }
 function apply(){
- const palettes={ameixa:['#120f1e','#251d37','#ffb65e'],brasa:['#221015','#382026','#ff996a'],jade:['#0c2021','#153638','#8fe2c3'],noite:['#080d19','#1a2438','#a9caff']};
- const palette=palettes[settings.theme]||palettes.ameixa;['--base','--panel','--accent'].forEach((key,i)=>document.documentElement.style.setProperty(key,palette[i]));
+ applyTheme(settings.theme);write('fire-game-theme',settings.theme);document.body.dataset.screen=settings.screen;
  for(const key of ['focus','contrast','bigtext'])document.body.classList.toggle(key,!!settings[key]);document.body.classList.toggle('scan',['lcd','crt'].includes(settings.filter));
  const canvas=emulator()?.canvas;if(canvas){canvas.style.setProperty('object-fit',settings.fit,'important');canvas.style.setProperty('image-rendering',el('sharp-image').checked?'pixelated':'auto','important');canvas.style.filter='brightness('+settings.brightness+'%) saturate('+settings.saturation+'%) '+({mono:'grayscale(1)',warm:'sepia(.35)',lcd:'contrast(.9)',crt:'contrast(1.18)'}[settings.filter]||'')}
  Android.orientation(settings.orientation==='vertical'?1:settings.orientation==='horizontal'?2:0);Android.immersive(!!settings.focus);
@@ -213,7 +243,9 @@ function apply(){
 }
 el('sharp-image').addEventListener('change',apply);el('control-size').addEventListener('input',place);
 new ResizeObserver(place).observe(deck);apply();
-window.EJS_onGameStart=()=>{refreshCheckpoint();updateMeta(rom.id,{last:Date.now(),sessions:(gameMeta(rom.id).sessions||0)+1});apply();say('Jogando offline');setInterval(()=>{
+function hideEmulatorMenu(){const menu=emulator()?.elements?.menuToggle;if(menu)menu.remove();}
+new MutationObserver(hideEmulatorMenu).observe(el('game'),{childList:true,subtree:true});hideEmulatorMenu();
+window.EJS_onGameStart=()=>{hideEmulatorMenu();refreshCheckpoint();updateMeta(rom.id,{last:Date.now(),sessions:(gameMeta(rom.id).sessions||0)+1});apply();say('Jogando offline');setInterval(()=>{
  const e=emulator();if(document.hidden||!e?.started||e.paused)return;activeSeconds++;updateMeta(rom.id,{seconds:(gameMeta(rom.id).seconds||0)+1});if(activeSeconds%Number(settings.interval)===0)saveGame(false);
  clock.textContent=[settings.clock?new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'',settings.timer?Math.floor(activeSeconds/60)+'m '+activeSeconds%60+'s':''].filter(Boolean).join(' · ')
  },1000)};

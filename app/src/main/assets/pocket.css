@@ -27,3 +27,21 @@ body[data-skin=arcade] .pad{border-radius:12px;box-shadow:inset 0 -5px 0 #0005}b
 #game{overflow:hidden}body[data-fit=cover] #game canvas,body[data-fit=fill] #game canvas{position:absolute!important;left:50%!important;top:50%!important;max-width:none!important;max-height:none!important;transform:translate(-50%,-50%)!important}
 body[data-fit=cover] #game canvas{width:max(100cqw,150cqh)!important;height:max(100cqh,66.667cqw)!important}body[data-fit=fill] #game canvas{width:100%!important;height:100%!important}#game .ejs_canvas_parent{container-type:size}
 .ejs_virtualGamepad_center,.ejs_virtualGamepad_button,.ejs_menu_button,.ejs_virtualGamepad{display:none!important}
+
+/* Consistent, theme-aware game shortcuts. The legacy EmulatorJS menu is unused. */
+.ejs_virtualGamepad_open,.ejs_menu,.ejs_menu_toggle,.ejs_menu_bar,.ejs_menu_button{display:none!important;pointer-events:none!important}
+body .floating-tool,body #reopen,body:not(.focus) #speed-button{width:46px;height:46px;min-width:0;min-height:0;padding:0;border:1px solid var(--line);border-radius:15px;background:var(--panel);color:var(--paper);box-shadow:0 3px 12px #0005,inset 0 1px 0 #ffffff0d;line-height:1;transform:translate(-50%,-50%) scale(var(--button-scale,1))}
+.floating-tool .section-icon,#reopen .section-icon{display:block;width:23px;height:23px;margin:0;vertical-align:initial;stroke-width:1.85}
+#save-shortcut{color:var(--accent)}.floating-tool:disabled{opacity:.45}.editing .floating-tool:disabled{opacity:.8;pointer-events:auto}
+body .pad{transform:translate(-50%,-50%) scale(calc(var(--control-scale)*var(--button-scale,1)))}
+.pad.action{background:var(--accent);color:var(--on-accent);border-color:var(--line)}
+#app-header,#settings-panel{background:var(--panel);color:var(--paper)}.setting label,.setting-title,.game-name,.panel-head button{color:var(--paper)}.setting small,#status{color:var(--muted)}.setting input[type=range],.setting input[type=checkbox]{accent-color:var(--accent)}
+#save-point,button.primary{background:var(--accent);color:var(--on-accent)}.shelf a{color:var(--accent)}#saved{background:linear-gradient(115deg,var(--panel),var(--base));border-color:var(--line)}.shelf small,.sub,#tools>summary{color:var(--muted)}.live-dot{background:var(--accent);box-shadow:0 0 10px var(--accent)}
+#layout-editor{position:fixed;z-index:45;left:50%;bottom:max(10px,env(safe-area-inset-bottom));transform:translateX(-50%);width:min(380px,calc(100vw - 20px));padding:12px 16px;border:1px solid var(--line);border-radius:20px;background:var(--panel);color:var(--paper);box-shadow:0 8px 36px #0008}
+.editor-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.editor-head strong{font-size:14px}.editor-head button{padding:7px 12px;background:var(--accent);color:var(--on-accent);border:0;font-size:13px}#layout-editor small{display:block;color:var(--muted);font-size:11px;margin:6px 0}#edit-target{width:100%;padding:6px 10px;font-size:13px}#layout-editor label{display:flex;justify-content:space-between;font-size:12px;margin-top:9px}#layout-editor input{width:100%;accent-color:var(--accent);margin:8px 0 0;touch-action:pan-x}.editing .selected-control{outline:3px solid var(--accent);outline-offset:5px;opacity:1;box-shadow:0 0 0 7px #ffffff15}.editing #console .pad{visibility:visible}
+body[data-screen=full] #game{position:absolute;inset:68px 0 0;width:100%!important;height:auto!important;flex:none;align-self:stretch}
+body.focus[data-screen=full] #game{inset:0}
+body[data-screen=full] #console{position:absolute;inset:68px 0 0;background:transparent;pointer-events:none}
+body.focus[data-screen=full] #console{inset:0}body[data-screen=full] #console .pad{pointer-events:auto}
+@media(orientation:landscape){body[data-screen=full] #game,body[data-screen=full] #console{top:58px}body.focus[data-screen=full] #game,body.focus[data-screen=full] #console{top:0}}
+@media(max-height:430px) and (orientation:landscape){body:not(.focus)[data-screen=full] #game,body:not(.focus)[data-screen=full] #console{top:50px}#layout-editor{width:min(350px,calc(100vw - 20px));padding:8px 12px}#layout-editor small{margin:3px 0}}
