@@ -45,3 +45,4 @@ body[data-screen=full] #console{position:absolute;inset:68px 0 0;background:tran
 body.focus[data-screen=full] #console{inset:0}body[data-screen=full] #console .pad{pointer-events:auto}
 @media(orientation:landscape){body[data-screen=full] #game,body[data-screen=full] #console{top:58px}body.focus[data-screen=full] #game,body.focus[data-screen=full] #console{top:0}}
 @media(max-height:430px) and (orientation:landscape){body:not(.focus)[data-screen=full] #game,body:not(.focus)[data-screen=full] #console{top:50px}#layout-editor{width:min(350px,calc(100vw - 20px));padding:8px 12px}#layout-editor small{margin:3px 0}}
+body #reopen.floating-tool{display:grid;place-items:center}
