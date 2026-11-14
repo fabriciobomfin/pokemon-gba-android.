@@ -46,3 +46,7 @@ body.focus[data-screen=full] #console{inset:0}body[data-screen=full] #console .p
 @media(orientation:landscape){body[data-screen=full] #game,body[data-screen=full] #console{top:58px}body.focus[data-screen=full] #game,body.focus[data-screen=full] #console{top:0}}
 @media(max-height:430px) and (orientation:landscape){body:not(.focus)[data-screen=full] #game,body:not(.focus)[data-screen=full] #console{top:50px}#layout-editor{width:min(350px,calc(100vw - 20px));padding:8px 12px}#layout-editor small{margin:3px 0}}
 body #reopen.floating-tool{display:grid;place-items:center}
+
+/* Remove letterboxing inside the emulation framebuffer before fitting its image. */
+body[data-fit=fill] #game canvas{width:calc(100% * var(--crop-x,1))!important;height:calc(100% * var(--crop-y,1))!important;object-fit:fill!important}
+body[data-fit=cover] #game canvas{width:calc(max(100cqw,150cqh) * var(--crop-x,1))!important;height:calc(max(100cqh,66.667cqw) * var(--crop-y,1))!important;object-fit:fill!important}

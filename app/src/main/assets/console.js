@@ -238,17 +238,26 @@ for(const id of ids){const b=make('button',id==='D'?'':id);b.className='pad '+(i
  b.onpointermove=e=>{if(b.hasPointerCapture(e.pointerId))update(e)};
  b.onlostpointercapture=e=>{inputs(e.pointerId,[]);b.classList.remove('pressed');for(const mark of b.children)mark.classList.remove('lit');if(editing)persist()}
 }
+let observedCanvas;
+function updateCanvasCrop(){
+ const e=emulator(),canvas=e?.canvas;if(!canvas)return;
+ const aspect=Number(e.gameManager?.getVideoDimensions('aspect'))||1.5;
+ const bufferAspect=canvas.width/canvas.height||aspect;
+ canvas.style.setProperty('--crop-x',Math.max(1,bufferAspect/aspect));
+ canvas.style.setProperty('--crop-y',Math.max(1,aspect/bufferAspect));
+ if(observedCanvas!==canvas){observedCanvas=canvas;new MutationObserver(updateCanvasCrop).observe(canvas,{attributes:true,attributeFilter:['width','height']});}
+}
 function apply(){
  applyTheme(settings.theme);write('fire-game-theme',settings.theme);document.body.dataset.screen=settings.screen;
  for(const key of ['focus','contrast','bigtext'])document.body.classList.toggle(key,!!settings[key]);document.body.classList.toggle('scan',['lcd','crt'].includes(settings.filter));
- const canvas=emulator()?.canvas;if(canvas){canvas.style.setProperty('object-fit',settings.fit,'important');canvas.style.setProperty('image-rendering',el('sharp-image').checked?'pixelated':'auto','important');canvas.style.filter='brightness('+settings.brightness+'%) saturate('+settings.saturation+'%) '+({mono:'grayscale(1)',warm:'sepia(.35)',lcd:'contrast(.9)',crt:'contrast(1.18)'}[settings.filter]||'')}
+ const canvas=emulator()?.canvas;if(canvas){canvas.style.setProperty('object-fit',settings.fit==='contain'?'contain':'fill','important');canvas.style.setProperty('image-rendering',el('sharp-image').checked?'pixelated':'auto','important');canvas.style.filter='brightness('+settings.brightness+'%) saturate('+settings.saturation+'%) '+({mono:'grayscale(1)',warm:'sepia(.35)',lcd:'contrast(.9)',crt:'contrast(1.18)'}[settings.filter]||'')}
  Android.orientation(settings.orientation==='vertical'?1:settings.orientation==='horizontal'?2:0);Android.immersive(!!settings.focus);
  const e=emulator();if(e?.started){e.volume=settings.mute?0:settings.volume/100;e.setVolume(e.volume)}
  updateSpeed()
- place()
+ updateCanvasCrop();place()
 }
 el('sharp-image').addEventListener('change',apply);el('control-size').addEventListener('input',place);
-new ResizeObserver(place).observe(deck);apply();
+new ResizeObserver(place).observe(deck);new ResizeObserver(updateCanvasCrop).observe(el('game'));apply();
 function hideEmulatorMenu(){const menu=emulator()?.elements?.menuToggle;if(menu)menu.remove();}
 new MutationObserver(hideEmulatorMenu).observe(el('game'),{childList:true,subtree:true});hideEmulatorMenu();
 window.EJS_onGameStart=()=>{hideEmulatorMenu();refreshCheckpoint();updateMeta(rom.id,{last:Date.now(),sessions:(gameMeta(rom.id).sessions||0)+1});apply();say('Jogando offline');setInterval(()=>{

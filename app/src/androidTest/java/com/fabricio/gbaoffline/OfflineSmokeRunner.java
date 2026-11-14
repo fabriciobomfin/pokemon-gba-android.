@@ -90,14 +90,18 @@ public class OfflineSmokeRunner extends Instrumentation {
             js(app,"settings.shortcut=true;settings.saveShortcut=true;apply();toggleSettings(false)");
             require("true".equals(js(app,"!el('save-shortcut').hidden && !!el('save-shortcut').querySelector('svg') && !!el('restore-shortcut').querySelector('svg') && getComputedStyle(el('reopen')).display==='grid'")),"Save/restore shortcuts or centered icons missing");
             js(app,"window.originalA=buttons.A.getBoundingClientRect().width;window.originalB=buttons.B.getBoundingClientRect().width;startEditing();selectControl('A');resizeInput.value=160;resizeInput.dispatchEvent(new Event('input'))");
-            Thread.sleep(250);capture("editor.png");js(app,"finishEditing()");
+            js(app,"EJS_emulator.pause()");Thread.sleep(1400);capture("editor.png");js(app,"finishEditing();EJS_emulator.play()");
             require("true".equals(js(app,"Math.abs(buttons.A.getBoundingClientRect().width/originalA-1.6)<.05 && Math.abs(buttons.B.getBoundingClientRect().width-originalB)<1 && read(profileKey,{}).sizes.A===160")),"Individual button size or persistence failed");
             js(app,"startEditing();selectControl('reopen');resizeInput.value=130;resizeInput.dispatchEvent(new Event('input'));finishEditing();settings.theme='dourado';apply();persist()");
             require("true".equals(js(app,"document.documentElement.dataset.theme==='dourado' && read('fire-game-theme','')==='dourado' && getComputedStyle(buttons.A).backgroundColor===getComputedStyle(el('save-point')).backgroundColor && scaleFor('reopen')===1.3")),"Unified theme or shortcut scaling failed");
             js(app,"settings.screen='full';settings.fit='fill';settings.orientation='horizontal';apply();persist()");
             waitJs(app,"innerWidth>innerHeight && Math.abs(el('game').getBoundingClientRect().width-innerWidth)<2 && Math.abs(el('game').getBoundingClientRect().height-innerHeight)<2");
-            Thread.sleep(700);
+            js(app,"EJS_emulator.pause();updateCanvasCrop()");Thread.sleep(1800);
+            android.util.Log.i("FireGameLayout",js(app,"JSON.stringify({window:[innerWidth,innerHeight],game:el('game').getBoundingClientRect().toJSON(),canvas:EJS_emulator.canvas.getBoundingClientRect().toJSON(),buffer:[EJS_emulator.canvas.width,EJS_emulator.canvas.height],aspect:EJS_emulator.gameManager.getVideoDimensions('aspect'),fit:document.body.dataset.fit,screen:document.body.dataset.screen})"));
             capture("controls-wide.png");
+            android.graphics.Bitmap filled=getUiAutomation().takeScreenshot();
+            for(float[] point:new float[][]{{.02f,.3f},{.98f,.3f},{.5f,.08f},{.5f,.92f}}){int color=filled.getPixel((int)(filled.getWidth()*point[0]),(int)(filled.getHeight()*point[1]));require(android.graphics.Color.red(color)>180&&android.graphics.Color.green(color)<100,"Full-screen image still has borders at "+point[0]+","+point[1]);}
+            filled.recycle();js(app,"EJS_emulator.play()");
             js(app,"settings.screen='console';settings.fit='contain';settings.orientation='vertical';apply();persist();el('save-shortcut').click()");
             // The new on-screen save shortcut creates a checkpoint.
 
