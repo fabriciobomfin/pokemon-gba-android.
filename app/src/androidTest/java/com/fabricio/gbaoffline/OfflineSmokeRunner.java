@@ -59,6 +59,9 @@ public class OfflineSmokeRunner extends Instrumentation {
             final MainActivity app = activity;
             waitJs(app, "typeof Android!=='undefined' && !!document.getElementById('import')");
             if (coldBoot) {
+                // Exclude the browser cache as a source: the Android cartridge file must restore it.
+                js(app,"window.batteryCacheCleared=false;var request=indexedDB.deleteDatabase('/data/saves');request.onsuccess=()=>window.batteryCacheCleared=true");
+                waitJs(app,"window.batteryCacheCleared");
                 js(app,"Android.play()");
                 waitJs(app,"window.EJS_emulator?.started && EJS_emulator.gameManager.getFrameNum()>120");
                 require("true".equals(js(app,"innerWidth>innerHeight")),"Reopened game must begin horizontally");
@@ -194,9 +197,11 @@ public class OfflineSmokeRunner extends Instrumentation {
                 }}
             js(app,"window.erased=false;historyDb().then(db=>{const tx=db.transaction('history','readwrite');tx.objectStore('history').clear();tx.oncomplete=()=>{db.close();window.erased=true}})");
             waitJs(app,"window.erased");
+            js(app,"var erasedFiles=JSON.parse(Android.loadFiles());for(const key of Object.keys(erasedFiles)){if(key.endsWith('.srm'))erasedFiles[key]=btoa(String.fromCharCode(0).repeat(atob(erasedFiles[key]).length));}Android.saveFiles(JSON.stringify(erasedFiles))");
             runOnMainSync(()->app.onActivityResult(14,Activity.RESULT_OK,new Intent().setData(Uri.fromFile(archive))));
             js(app,"window.recovered=false;window.checkRecovery=setInterval(async()=>{const db=await historyDb();const count=await query(db,s=>s.count());db.close();if(count){clearInterval(checkRecovery);window.recovered=true}},200)");
             waitJs(app,"window.recovered");
+            require("true".equals(js(app,"Object.entries(JSON.parse(Android.loadFiles())).some(([key,value])=>key.endsWith('.srm')&&atob(value).charCodeAt(0)===90)")),"Imported cartridge backup did not restore the saved byte");
             js(app,"Android.play();true");
             waitJs(app,"!!(window.EJS_emulator && EJS_emulator.started && EJS_emulator.gameManager && EJS_emulator.gameManager.getFrameNum()>60)");
             require("true".equals(js(app,"Array.from(EJS_emulator.gameManager.FS.readFile('/data/saves/offline-test')).join(',')==='11,22,33'")),"Save persistence failed");

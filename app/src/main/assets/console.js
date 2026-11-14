@@ -169,15 +169,23 @@ const restoreShortcut=action('',()=>useCheckpoint(false));restoreShortcut.append
 const saveShortcut=action('',()=>useCheckpoint(true));saveShortcut.id='save-shortcut';saveShortcut.append(sectionIcon('backup'));saveShortcut.setAttribute('aria-label','Salvar jogo');document.body.append(saveShortcut);
 const floats=[el('reopen'),speedButton,restoreShortcut,saveShortcut];
 function placeTools(){
- floats.forEach((b,i)=>{
-  const pos=settings.positions[keyLayout()]?.[b.id];
-  const scale=scaleFor(b.id),margin=26*scale;
-  b.style.setProperty('--button-scale',scale);
-  const x=pos?innerWidth*pos[0]/100:innerWidth-32-i*54;
-  const y=pos?innerHeight*pos[1]/100:!landscape.matches&&settings.screen==='console'?el('game').getBoundingClientRect().bottom+32:32;
-  b.style.setProperty('left',Math.max(margin,Math.min(innerWidth-margin,x))+'px','important');
-  b.style.setProperty('top',Math.max(margin,Math.min(innerHeight-margin,y))+'px','important');
- });
+ const visible=floats.filter(button=>!button.hidden);
+ const widths=visible.map(button=>46*scaleFor(button.id));
+ const total=widths.reduce((sum,width)=>sum+width,0)+Math.max(0,visible.length-1)*8;
+ let offset=(innerWidth-total)/2;
+ const centers=new Map();
+ visible.forEach((button,i)=>{centers.set(button.id,offset+widths[i]/2);offset+=widths[i]+8;});
+ const rowMargin=Math.max(23,...widths.map(width=>width/2))+8;
+ const rowTop=!landscape.matches&&settings.screen==='console'?el('game').getBoundingClientRect().bottom+rowMargin:rowMargin;
+ for(const button of floats){
+  const pos=settings.positions[keyLayout()]?.[button.id];
+  const scale=scaleFor(button.id),margin=26*scale;
+  button.style.setProperty('--button-scale',scale);
+  const x=pos?innerWidth*pos[0]/100:centers.get(button.id)||innerWidth/2;
+  const y=pos?innerHeight*pos[1]/100:rowTop;
+  button.style.setProperty('left',Math.max(margin,Math.min(innerWidth-margin,x))+'px','important');
+  button.style.setProperty('top',Math.max(margin,Math.min(innerHeight-margin,y))+'px','important');
+ }
 }
 for(const b of floats){
  b.classList.add('floating-tool');
