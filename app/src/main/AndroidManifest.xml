@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Deliberately no INTERNET permission: all runtime assets are packaged. -->
-    <application android:icon="@drawable/lume" android:label="Fire Game 2.7" android:theme="@android:style/Theme.Material.NoActionBar" android:allowBackup="false" android:hardwareAccelerated="true" android:usesCleartextTraffic="false" android:largeHeap="true">
+    <application android:icon="@drawable/lume" android:label="Fire Game 2.8" android:theme="@android:style/Theme.Material.NoActionBar" android:allowBackup="false" android:hardwareAccelerated="true" android:usesCleartextTraffic="false" android:largeHeap="true">
         <activity android:name=".MainActivity" android:exported="true" android:configChanges="orientation|screenSize|keyboardHidden">
             <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
         </activity>

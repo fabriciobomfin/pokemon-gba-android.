@@ -9,10 +9,17 @@ gradle assembleDebugAndroidTest --no-daemon --stacktrace || exit 1
 adb install -r app/build/outputs/apk/debug/app-debug.apk || exit 1
 adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk || exit 1
 test_result=0
-adb shell am instrument -w -r com.fabricio.firegame.shelf.test/com.fabricio.gbaoffline.OfflineSmokeRunner | tee app/build/reports/device/instrumentation.txt
+adb shell am instrument -w -r com.fabricio.firegame.battery.test/com.fabricio.gbaoffline.OfflineSmokeRunner | tee app/build/reports/device/instrumentation.txt
 if ! grep -Fq 'OK (1 test)' app/build/reports/device/instrumentation.txt; then test_result=1; fi
-adb exec-out run-as com.fabricio.firegame.shelf cat cache/smoke.png > app/build/reports/device/framebuffer.png || true
-adb exec-out run-as com.fabricio.firegame.shelf cat cache/controls-wide.png > app/build/reports/device/controls-wide.png || true
-adb exec-out run-as com.fabricio.firegame.shelf cat cache/editor.png > app/build/reports/device/editor.png || true
+adb exec-out run-as com.fabricio.firegame.battery cat cache/smoke.png > app/build/reports/device/framebuffer.png || true
+adb exec-out run-as com.fabricio.firegame.battery cat cache/controls-wide.png > app/build/reports/device/controls-wide.png || true
+adb exec-out run-as com.fabricio.firegame.battery cat cache/editor.png > app/build/reports/device/editor.png || true
+if [ "$test_result" -eq 0 ]; then
+  adb shell am force-stop com.fabricio.firegame.battery
+  adb shell am instrument -w -r -e phase battery-reopen com.fabricio.firegame.battery.test/com.fabricio.gbaoffline.OfflineSmokeRunner | tee app/build/reports/device/cold-boot.txt
+  if ! grep -Fq 'OK (1 test)' app/build/reports/device/cold-boot.txt; then test_result=1; fi
+fi
+adb exec-out run-as com.fabricio.firegame.battery cat cache/portrait.png > app/build/reports/device/portrait.png || true
+adb exec-out run-as com.fabricio.firegame.battery cat cache/battery-reopen.png > app/build/reports/device/battery-reopen.png || true
 adb logcat -d > app/build/reports/device/logcat.txt || true
 exit "$test_result"

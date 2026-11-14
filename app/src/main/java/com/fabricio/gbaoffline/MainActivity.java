@@ -32,6 +32,8 @@ public class MainActivity extends Activity {
     private final ExecutorService imports = Executors.newSingleThreadExecutor();
     WebView web;
     private boolean importing;
+    private boolean backgrounded;
+    private int pauseGeneration;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -166,7 +168,7 @@ public class MainActivity extends Activity {
             return result.toString();
         }
         @JavascriptInterface public void play() {
-            runOnUiThread(() -> { if (!importing && new File(getFilesDir(), "game.gba").isFile()) web.loadUrl(PLAY); });
+            runOnUiThread(() -> { if (!importing && new File(getFilesDir(), "game.gba").isFile()) openGame(); });
         }
         @JavascriptInterface public void home() { runOnUiThread(() -> { orientation(0); immersive(false); web.loadUrl(HOME); }); }
         @JavascriptInterface public boolean saveFiles(String json) {
@@ -181,7 +183,10 @@ public class MainActivity extends Activity {
                     if (!safeSaveName(name)) return false;
                     byte[] bytes = android.util.Base64.decode(files.getString(name), android.util.Base64.DEFAULT);
                     if (bytes.length > 2 * 1024 * 1024) return false;
-                    AtomicFile file = new AtomicFile(new File(directory, name));
+                    File destination = new File(directory, name);
+                    File parent = destination.getParentFile();
+                    if (!parent.isDirectory() && !parent.mkdirs()) return false;
+                    AtomicFile file = new AtomicFile(destination);
                     FileOutputStream out = file.startWrite();
                     try { out.write(bytes); file.finishWrite(out); }
                     catch (IOException error) { file.failWrite(out); throw error; }
@@ -192,23 +197,37 @@ public class MainActivity extends Activity {
         @JavascriptInterface public String loadFiles() {
             JSONObject result = new JSONObject();
             try {
-                File[] files = saveDirectory().listFiles();
-                if (files != null) for (File file : files) {
-                    String name = file.getName();
-                    if (!file.isFile() || !safeSaveName(name) || name.endsWith(".new") || name.endsWith(".bak") || file.length() > 2 * 1024 * 1024) continue;
-                    try (InputStream input = new AtomicFile(file).openRead(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
-                        byte[] buffer = new byte[8192]; int count;
-                        while ((count=input.read(buffer))!=-1) out.write(buffer,0,count);
-                        result.put(name,android.util.Base64.encodeToString(out.toByteArray(),android.util.Base64.NO_WRAP));
-                    }
-                }
+                collectSaves(saveDirectory(), "", result);
             } catch (Exception ignored) { }
             return result.toString();
         }
     }
 
+    private void collectSaves(File directory, String prefix, JSONObject result) throws Exception {
+        File[] entries = directory.listFiles();
+        if (entries == null) return;
+        for (File entry : entries) {
+            String name = prefix + entry.getName();
+            if (!safeSaveName(name)) continue;
+            if (entry.isDirectory()) {
+                collectSaves(entry, name + "/", result);
+            } else if (entry.isFile() && !name.endsWith(".new") && !name.endsWith(".bak") && entry.length() <= 2 * 1024 * 1024) {
+                try (InputStream input = new AtomicFile(entry).openRead(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+                    byte[] buffer = new byte[8192]; int count;
+                    while ((count = input.read(buffer)) != -1) out.write(buffer, 0, count);
+                    result.put(name, android.util.Base64.encodeToString(out.toByteArray(), android.util.Base64.NO_WRAP));
+                }
+            }
+        }
+    }
     private boolean safeSaveName(String name) {
-        return name.matches("[a-zA-Z0-9._-]{1,160}") && !name.equals(".") && !name.equals("..");
+        if (name.length() > 320) return false;
+        String[] parts = name.split("/", -1);
+        if (parts.length > 4) return false;
+        for (String part : parts) {
+            if (!part.matches("[a-zA-Z0-9._-]{1,160}") || part.equals(".") || part.equals("..")) return false;
+        }
+        return true;
     }
     private File saveDirectory() throws IOException {
         String id = getPreferences(MODE_PRIVATE).getString("romId", "game");
@@ -346,7 +365,7 @@ public class MainActivity extends Activity {
                 StringBuilder hash = new StringBuilder();
                 for (byte b : digest.digest()) hash.append(String.format("%02x", b & 255));
                 getPreferences(MODE_PRIVATE).edit().putString("romName", name).putString("romId", hash.toString()).commit();
-                runOnUiThread(() -> { importing = false; if (!isDestroyed()) web.loadUrl(PLAY); });
+                runOnUiThread(() -> { importing = false; if (!isDestroyed()) openGame(); });
             } catch (Exception e) {
                 if (output != null) target.failWrite(output);
                 String message = e.getMessage() == null ? "Não foi possível importar a ROM." : e.getMessage();
@@ -354,13 +373,23 @@ public class MainActivity extends Activity {
             }
         });
     }
+    private void openGame() {
+        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+        web.loadUrl(PLAY);
+    }
     @Override protected void onPause() {
-        web.evaluateJavascript("if(window.flushAndPause) flushAndPause()", null);
-        web.onPause();
+        backgrounded = true;
+        final int generation = ++pauseGeneration;
+        // Keep the WebView running until its synchronous native save has completed.
+        web.evaluateJavascript("if(window.flushAndPause) flushAndPause()", result -> {
+            if (backgrounded && generation == pauseGeneration && !isDestroyed()) web.onPause();
+        });
         super.onPause();
     }
     @Override protected void onResume() {
         super.onResume();
+        backgrounded = false;
+        ++pauseGeneration;
         if (web != null) { web.onResume(); web.evaluateJavascript("if(window.resumeGame) resumeGame()", null); }
     }
     @Override public void onBackPressed() {

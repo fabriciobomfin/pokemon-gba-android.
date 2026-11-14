@@ -33,16 +33,68 @@
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important}}
 </style><link rel="stylesheet" href="pocket.css"></head><body><header id="app-header"><button class="back-button" aria-label="Voltar ao início" onclick="leaveGame()">‹</button><div class="game-info"><div class="brand-line"><span class="live-dot"></span>FIRE GAME</div><strong class="game-name" id="game-name">Carregando jogo…</strong><span id="status" role="status" aria-live="polite">Preparando o jogo</span></div><div class="toolbar"><button class="tool-button" id="settings-toggle" aria-label="Menu do jogo" aria-expanded="false" onclick="toggleSettings()">⚙</button></div></header><aside id="settings-panel" hidden><div class="panel-head"><strong>Configurações do jogo</strong><button aria-label="Fechar configurações" onclick="toggleSettings(false)">×</button></div><div class="setting"><label for="control-size">Tamanho dos controles <span id="size-value">100%</span></label><input id="control-size" type="range" min="75" max="125" step="5" value="100"><small>Ajuste as áreas e botões ao tamanho da sua mão.</small></div><div class="setting"><label for="control-opacity">Transparência dos controles <span id="opacity-value">72%</span></label><input id="control-opacity" type="range" min="35" max="95" step="5" value="70"><small>Deixe os controles mais discretos ou mais visíveis.</small></div><div class="setting"><label for="show-controls">Mostrar controles na tela <input id="show-controls" type="checkbox" checked></label></div><div class="setting"><label for="sharp-image">Pixels nítidos <input id="sharp-image" type="checkbox" checked></label><small>Preserva o aspecto pixelado original dos jogos.</small></div></aside><main id="game"></main><section id="console" aria-label="Controle GBA"></section><button id="speed-button" type="button">1×</button><button id="reopen" aria-label="Abrir menu">☰</button><div id="error">O emulador não iniciou. <a href="index.html">Voltar ao início</a><p id="errorText"></p></div><script>
 const rom=JSON.parse(Android.info());if(!rom.available)Android.home();document.getElementById('game-name').textContent=rom.name||'Jogo de Game Boy Advance';
-window.EJS_player='#game';window.EJS_core='mgba';window.EJS_gameUrl='/roms/'+rom.id+'.gba';window.EJS_gameName='gba-'+rom.id;window.EJS_pathtodata='/assets/data/';window.EJS_language='pt-BR';window.EJS_disableAutoLang=false;window.EJS_startOnLoaded=true;window.EJS_startButtonName='Jogar';window.EJS_threads=false;window.EJS_color='#69e3b4';window.EJS_controlScheme='gba';window.EJS_Buttons={screenshot:false,contextMenu:false,netplay:false,volume:true,saveState:false,loadState:false,saveSavFiles:false,loadSavFiles:false,screenRecord:false};window.EJS_defaultOptions={'save-save-interval':5,'virtual-gamepad':'enabled'};
+window.EJS_player='#game';window.EJS_core='mgba';window.EJS_gameUrl='/roms/'+rom.id+'.gba';window.EJS_gameName='gba-'+rom.id;window.EJS_pathtodata='/assets/data/';window.EJS_language='pt-BR';window.EJS_disableAutoLang=false;window.EJS_startOnLoaded=false;window.EJS_startButtonName='Jogar';window.EJS_threads=false;window.EJS_color='#69e3b4';window.EJS_controlScheme='gba';window.EJS_Buttons={screenshot:false,contextMenu:false,netplay:false,volume:true,saveState:false,loadState:false,saveSavFiles:false,loadSavFiles:false,screenRecord:false};window.EJS_defaultOptions={'save-save-interval':5,'virtual-gamepad':'enabled'};
 let wasRunning=false;
 function toBase64(bytes){let value='';for(let offset=0;offset<bytes.length;offset+=8192)value+=String.fromCharCode.apply(null,bytes.subarray(offset,offset+8192));return btoa(value);}
-function saveGame(notify){const e=window.EJS_emulator;if(!e||!e.started||!e.gameManager)return false;const g=e.gameManager;try{g.saveSaveFiles();let files={};for(const name of g.FS.readdir('/data/saves')){if(name==='.'||name==='..')continue;const path='/data/saves/'+name;if(g.FS.isFile(g.FS.stat(path).mode))files[name]=toBase64(g.FS.readFile(path));}const ok=Android.saveFiles(JSON.stringify(files));g.FS.syncfs(false,()=>{});if(notify)document.getElementById('status').textContent=ok?'Progresso gravado no aparelho':'Falha ao gravar';return ok;}catch(error){if(notify)document.getElementById('status').textContent='Falha ao gravar';return false;}}
-window.flushAndPause=()=>{const e=window.EJS_emulator;wasRunning=!!(e&&e.started&&!e.paused);saveGame(false);if(wasRunning)e.pause();};window.resumeGame=()=>{const e=window.EJS_emulator;if(wasRunning&&e&&e.started)e.play();wasRunning=false;};window.leaveGame=()=>{saveGame(false);Android.home();};
+let lastNativeSave='';
+function validSavePath(name){
+ return name.length<=320 && name.split('/').length<=4 &&
+  name.split('/').every(part=>/^[a-zA-Z0-9._-]{1,160}$/.test(part)&&part!=='.'&&part!=='..');
+}
+function collectSaveFiles(fs,directory='/data/saves',prefix='',files={}){
+ for(const name of fs.readdir(directory)){
+  if(name==='.'||name==='..')continue;
+  const relative=prefix+name,path=directory+'/'+name;
+  if(!validSavePath(relative))continue;
+  const stat=fs.stat(path);
+  if(fs.isDir(stat.mode))collectSaveFiles(fs,path,relative+'/',files);
+  else if(fs.isFile(stat.mode))files[relative]=toBase64(fs.readFile(path));
+ }
+ return files;
+}
+function persistCartridgeFiles(){
+ const g=window.EJS_emulator?.gameManager;if(!g)return false;
+ const json=JSON.stringify(collectSaveFiles(g.FS));
+ if(json===lastNativeSave)return true;
+ if(!Android.saveFiles(json))return false;
+ lastNativeSave=json;
+ return true;
+}
+function saveGame(notify){
+ const e=window.EJS_emulator;if(!e?.started||!e.gameManager)return false;
+ try{
+  e.gameManager.saveSaveFiles();
+  const ok=persistCartridgeFiles();
+  if(notify||!ok)document.getElementById('status').textContent=ok?'Progresso do cartucho gravado':'Falha ao gravar o progresso. Tente novamente.';
+  return ok;
+ }catch(error){
+  console.error('Falha ao gravar o cartucho',error);
+  document.getElementById('status').textContent='Falha ao gravar o progresso. Tente novamente.';
+  return false;
+ }
+}
+window.flushAndPause=()=>{const e=window.EJS_emulator;wasRunning=!!(e&&e.started&&!e.paused);saveGame(false);if(wasRunning)e.pause();};window.resumeGame=()=>{const e=window.EJS_emulator;if(wasRunning&&e&&e.started)e.play();wasRunning=false;};window.leaveGame=()=>{if(!window.EJS_emulator?.started||saveGame(false))Android.home();else alert('Não foi possível gravar o progresso. Tente novamente antes de sair.');};
 function toggleSettings(force){const panel=document.getElementById('settings-panel');const open=typeof force==='boolean'?force:panel.hidden;panel.hidden=!open;if(open){for(const group of panel.querySelectorAll('details'))group.open=false;panel.scrollTop=0;}for(const id of ['settings-toggle','reopen'])document.getElementById(id).setAttribute('aria-expanded',String(open));}
 function applyPreferences(){let prefs={};try{prefs=JSON.parse(localStorage.getItem('gba-visual-settings:'+rom.id)||'{}')}catch(_){}const size=document.getElementById('control-size'),opacity=document.getElementById('control-opacity'),show=document.getElementById('show-controls'),sharp=document.getElementById('sharp-image');size.value=prefs.size||100;opacity.value=prefs.opacity||70;show.checked=prefs.show!==false;sharp.checked=prefs.sharp!==false;const apply=()=>{document.documentElement.style.setProperty('--control-scale',Number(size.value)/100);document.documentElement.style.setProperty('--control-opacity',Number(opacity.value)/100);document.body.classList.toggle('controls-hidden',!show.checked);document.querySelectorAll('.ejs_canvas').forEach(canvas=>canvas.style.imageRendering=sharp.checked?'pixelated':'auto');document.getElementById('size-value').textContent=size.value+'%';document.getElementById('opacity-value').textContent=opacity.value+'%';try{localStorage.setItem('gba-visual-settings:'+rom.id,JSON.stringify({size:Number(size.value),opacity:Number(opacity.value),show:show.checked,sharp:sharp.checked}));}catch(_){} };for(const control of [size,opacity,show,sharp])control.addEventListener('input',apply);for(const control of [show,sharp])control.addEventListener('change',apply);apply();}
 applyPreferences();document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!document.getElementById('settings-panel').hidden)toggleSettings(false);});
-function restoreNativeSaves(fs){try{const files=JSON.parse(Android.loadFiles()||'{}');for(const [name,encoded] of Object.entries(files)){if(!/^[a-zA-Z0-9._-]{1,160}$/.test(name)||name==='.'||name==='..')continue;const value=atob(encoded);const bytes=new Uint8Array(value.length);for(let i=0;i<value.length;i++)bytes[i]=value.charCodeAt(i);fs.writeFile('/data/saves/'+name,bytes);}}catch(error){console.error('Não foi possível restaurar os saves locais',error);}}
-window.EJS_ready=()=>{document.getElementById('status').textContent='Toque em Jogar';const emulator=window.EJS_emulator;emulator.on('saveDatabaseLoaded',restoreNativeSaves);const fs=emulator.gameManager&&emulator.gameManager.FS;if(fs)restoreNativeSaves(fs);else setTimeout(()=>{const current=window.EJS_emulator;const readyFs=current&&current.gameManager&&current.gameManager.FS;if(readyFs)restoreNativeSaves(readyFs);},100);};
+function restoreNativeSaves(fs){
+ const files=JSON.parse(Android.loadFiles()||'{}');
+ for(const [name,encoded] of Object.entries(files)){
+  if(!validSavePath(name))continue;
+  const value=atob(encoded),bytes=Uint8Array.from(value,c=>c.charCodeAt(0));
+  const parts=name.split('/');parts.pop();
+  let directory='/data/saves';
+  for(const part of parts){directory+='/'+part;if(!fs.analyzePath(directory).exists)fs.mkdir(directory);}
+  fs.writeFile('/data/saves/'+name,bytes);
+ }
+}
+window.EJS_ready=()=>{
+ const emulator=window.EJS_emulator;
+ emulator.on('saveDatabaseLoaded',restoreNativeSaves);
+ emulator.on('saveSaveFiles',()=>{try{persistCartridgeFiles();}catch(error){console.error('Falha na cópia do cartucho',error);}});
+ // Install restoration before loading the core, including a warm cached launch.
+ document.querySelector('.ejs_start_button').click();
+};
 
 window.runtimeErrors=[];window.addEventListener('error',event=>{window.runtimeErrors.push(event.message);if(window.webviewUnsupported)return;document.getElementById('error').style.display='block';document.getElementById('errorText').textContent=event.message||'Falha ao carregar um componente local.';});
 try{new Function('let a={}; a.x ??= 1; return a?.x;')();}catch(error){window.webviewUnsupported=true;document.getElementById('error').style.display='block';document.getElementById('errorText').textContent='Atualize o Android System WebView e reabra o aplicativo.';}

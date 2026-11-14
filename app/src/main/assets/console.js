@@ -1,6 +1,8 @@
 const deck=el('console'),panel=el('settings-panel'),profileKey='pocket:'+rom.id;
-const defaults={skin:'round',accent:'tema',focus:true,theme:'ameixa',orientation:'auto',preset:'classic',volume:75,filter:'original',brightness:100,saturation:100,fit:'contain',speed:'1',interval:5,positions:{},sizes:{},screen:'console',haptic:true};
+const defaults={skin:'round',accent:'tema',focus:true,theme:'ameixa',orientation:'horizontal',preset:'classic',volume:75,filter:'original',brightness:100,saturation:100,fit:'contain',speed:'1',interval:1,positions:{},sizes:{},screen:'console',haptic:true};
 let settings=Object.assign({},defaults,read(profileKey,{})),editing=false,activeSeconds=0;
+settings.orientation='horizontal';
+if(settings.batterySaveVersion!==1){settings.interval=1;settings.batterySaveVersion=1;}
 settings.positions=settings.positions||{};settings.sizes=settings.sizes||{};
 settings.theme=read('fire-game-theme',settings.theme);delete settings.accent;
 // Older floating shortcuts had unrelated positions; align just those once.
@@ -136,7 +138,7 @@ setting('fit','Enquadramento',choices('contain|Proporção original','cover|Pree
 setting('filter','Imagem',choices('original|Original','lcd|LCD','crt|CRT','mono|Monocromática','warm|Quente'));
 setting('brightness','Brilho da imagem',[50,150,5],'range');setting('saturation','Intensidade das cores',[0,170,5],'range');
 setting('volume','Volume',[0,100,5],'range');
-setting('interval','Intervalo de gravação',choices('5|5 segundos','15|15 segundos','30|30 segundos'));
+setting('interval','Gravação do cartucho',choices('1|1 segundo','5|5 segundos','15|15 segundos','30|30 segundos'));
 for(const [key,label] of Object.entries({mute:'Silenciar áudio',focus:'Ocultar cabeçalho e barras',haptic:'Vibração dos botões',contrast:'Alto contraste',bigtext:'Texto ampliado no menu',clock:'Relógio no cabeçalho',timer:'Tempo da sessão',swap:'Trocar A e B',diagonal:'Permitir diagonais no direcional'})){
  if(key==='diagonal'&&settings[key]===undefined)settings[key]=false;setting(key,label,[],'checkbox')
 }
@@ -172,7 +174,7 @@ function placeTools(){
   const scale=scaleFor(b.id),margin=26*scale;
   b.style.setProperty('--button-scale',scale);
   const x=pos?innerWidth*pos[0]/100:innerWidth-32-i*54;
-  const y=pos?innerHeight*pos[1]/100:32;
+  const y=pos?innerHeight*pos[1]/100:!landscape.matches&&settings.screen==='console'?el('game').getBoundingClientRect().bottom+32:32;
   b.style.setProperty('left',Math.max(margin,Math.min(innerWidth-margin,x))+'px','important');
   b.style.setProperty('top',Math.max(margin,Math.min(innerHeight-margin,y))+'px','important');
  });
@@ -204,7 +206,7 @@ function inputs(pointer,next){const old=held.get(pointer)||[];held.set(pointer,n
 function keyLayout(){return (landscape.matches?'wide':'tall')+settings.preset}
 function place(){
  placeTools();
- let points=landscape.matches?[[10,56],[94,52],[85,68],[9,16],[91,16],[7,88],[93,88]]:[[22,52],[85,43],[69,58],[16,16],[84,16],[40,83],[60,83]];
+ let points=landscape.matches?[[10,56],[94,52],[85,68],[9,16],[91,16],[7,88],[93,88]]:[[23,52],[84,45],[66,60],[16,25],[84,25],[40,85],[60,85]];
  ids.forEach((id,i)=>{let [x,y]=points[i];if(settings.preset==='left')x=100-x;if(settings.preset==='compact'){y=50+(y-50)*.78;x=x<50?x+2:x-2}
  const saved=settings.positions[keyLayout()]?.[id];if(saved)[x,y]=saved;const b=buttons[id],rect=deck.getBoundingClientRect(),scale=Number(el('control-size').value)/100*scaleFor(id);b.style.setProperty('--button-scale',scaleFor(id));
  const limit=(v,size,dim)=>dim?Math.max(size*50/dim,Math.min(100-size*50/dim,v)):v;

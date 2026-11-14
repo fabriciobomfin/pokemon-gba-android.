@@ -14,9 +14,14 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
-/** Uses an original 256-byte homebrew test program, never a commercial ROM. */
+/** Tests a homebrew that writes cartridge SRAM on A and shows green after a cold boot. */
 public class OfflineSmokeRunner extends Instrumentation {
-    @Override public void onCreate(Bundle arguments) { super.onCreate(arguments); start(); }
+    private boolean coldBoot;
+    @Override public void onCreate(Bundle arguments) {
+        super.onCreate(arguments);
+        coldBoot = "battery-reopen".equals(arguments.getString("phase"));
+        start();
+    }
     private String js(MainActivity activity, String script) throws Exception {
         CountDownLatch done = new CountDownLatch(1);
         AtomicReference<String> value = new AtomicReference<>();
@@ -53,17 +58,43 @@ public class OfflineSmokeRunner extends Instrumentation {
             activity = (MainActivity)startActivitySync(launch);
             final MainActivity app = activity;
             waitJs(app, "typeof Android!=='undefined' && !!document.getElementById('import')");
+            if (coldBoot) {
+                js(app,"Android.play()");
+                waitJs(app,"window.EJS_emulator?.started && EJS_emulator.gameManager.getFrameNum()>120");
+                require("true".equals(js(app,"innerWidth>innerHeight")),"Reopened game must begin horizontally");
+                js(app,"EJS_emulator.pause()");
+                Thread.sleep(1000);
+                android.graphics.Bitmap image=getUiAutomation().takeScreenshot();
+                int green=0;
+                for(int y=0;y<image.getHeight();y+=3)for(int x=0;x<image.getWidth();x+=3){
+                    int color=image.getPixel(x,y);
+                    if(android.graphics.Color.green(color)>180 && android.graphics.Color.red(color)<70 && android.graphics.Color.blue(color)<70)green++;
+                }
+                image.recycle();
+                require(green>1000,"The ROM did not read its saved cartridge SRAM after process death");
+                require("true".equals(js(app,"EJS_emulator.gameManager.getSaveFile(false)?.[0]===90")),"Cartridge bytes lost after process death");
+                capture("battery-reopen.png");
+                status.putString("stream","\nCartridge SRAM recovered by the ROM after force-stop, without loading a checkpoint.\n");
+                sendStatus(0,status);
+                Bundle result=new Bundle();result.putString("stream","\nOK (1 test)\n");finish(Activity.RESULT_OK,result);
+                return;
+            }
             waitJs(app,"document.querySelectorAll('#gallery button').length===14");
             require("true".equals(js(app,"openPage('categories'); !el('categories-page').hidden && el('game-count').textContent==='0 jogos'")),"Empty category count");
             require("true".equals(js(app,"el('gba-category').click(); !el('home-page').hidden && el('recent').hidden")),"Category navigation failed");
             require("true".equals(js(app,"document.querySelector('[data-page=themes]').click(); Array.from(el('gallery').children).every(b=>{b.click();return b.getAttribute('aria-pressed')==='true' && document.documentElement.dataset.theme===b.dataset.id && read('fire-game-theme','')===b.dataset.id && (!themes[b.dataset.id].pattern || getComputedStyle(b.firstChild).backgroundImage.includes('gradient'))})")),"Theme gallery selection failed");
             js(app,"document.querySelector('[data-id=ciano]').click();openPage('home')");
-            // ARM code: set mode 3, fill VRAM red, then loop. No BIOS/logo/game assets.
+            // ARM homebrew draws red on a new cartridge and green when SRAM[0] is 0x5a.
+            // Holding A writes that byte through the GBA memory bus.
             byte[] rom = new byte[512];
             ByteBuffer words=ByteBuffer.wrap(rom).order(ByteOrder.LITTLE_ENDIAN);
             words.putInt(0, 0xea00002e); // branch to 0xc0
             rom[0xb2]=(byte)0x96;
-            int[] program={0xe3a00301,0xe3a01b01,0xe2811003,0xe1c010b0,0xe3a00406,0xe3a0101f,0xe3a02c96,0xe0c010b2,0xe2522001,0x1afffffc,0xe3a03301,0xe2833e13,0xe1d340b0,0xe3140001,0x1afffffc,0xe3a0540e,0xe3a0605a,0xe5c56000,0xeafffff8};
+            int[] program={0xe3a00301,0xe3a01b01,0xe2811003,0xe1c010b0,
+                0xe3a0540e,0xe5d56000,0xe356005a,0xe3a0101f,0x03a01e3e,
+                0xe3a00406,0xe3a02c96,0xe0c010b2,0xe2522001,0x1afffffc,
+                0xe3a03301,0xe2833e13,0xe1d340b0,0xe3140001,0x1afffffc,
+                0xe3a0605a,0xe5c56000,0xeafffff9};
             for(int n=0;n<program.length;n++)words.putInt(0xc0+n*4,program[n]);
             System.arraycopy("SRAM_V113".getBytes("US-ASCII"),0,rom,400,9);
             File file = new File(getTargetContext().getCacheDir(), "offline-smoke.gba");
@@ -87,9 +118,12 @@ public class OfflineSmokeRunner extends Instrumentation {
             screenshot.recycle();
             js(app,"EJS_emulator.gameManager.simulateInput(0,8,1)");
             Thread.sleep(400);
-            js(app,"EJS_emulator.gameManager.simulateInput(0,8,0);saveGame(false)");
+            js(app,"EJS_emulator.gameManager.simulateInput(0,8,0)");
             Thread.sleep(1500);
-            android.util.Log.i("FireGameBattery",js(app,"JSON.stringify({path:EJS_emulator.gameManager.getSaveFilePath(),tree:EJS_emulator.gameManager.FS.readdir('/data/saves'),battery:EJS_emulator.gameManager.getSaveFile(false)?.slice(0,8),native:Android.loadFiles()})"));
+            waitJs(app,"Object.values(JSON.parse(Android.loadFiles())).some(v=>atob(v).charCodeAt(0)===90)");
+            android.util.Log.i("FireGameBattery",js(app,"JSON.stringify({path:EJS_emulator.gameManager.getSaveFilePath(),nativeNames:Object.keys(JSON.parse(Android.loadFiles()))})"));
+            require("true".equals(js(app,"innerWidth>innerHeight && settings.orientation==='horizontal'")),"Initial horizontal orientation failed");
+            require("false".equals(js(app,"Android.saveFiles(JSON.stringify({'../escape':'Wg=='}))")),"Save traversal accepted");
             require("true".equals(js(app,"EJS_emulator.gameManager.getSaveFile(false)?.[0]===90")),"ROM cartridge write not flushed to battery file");
             require("true".equals(js(app,"Object.values(JSON.parse(Android.loadFiles())).some(v=>atob(v).charCodeAt(0)===90)")),"Real cartridge save missing from native storage");
             require("true".equals(js(app,"document.querySelectorAll('#console button.pad').length===7 && document.querySelector('#console .action').getBoundingClientRect().width>30")),"Touch controls missing");
@@ -116,6 +150,9 @@ public class OfflineSmokeRunner extends Instrumentation {
             for(float[] point:new float[][]{{.02f,.3f},{.98f,.3f},{.5f,.08f},{.5f,.92f}}){int color=filled.getPixel((int)(filled.getWidth()*point[0]),(int)(filled.getHeight()*point[1]));require(android.graphics.Color.red(color)>180&&android.graphics.Color.green(color)<100,"Full-screen image still has borders at "+point[0]+","+point[1]);}
             filled.recycle();js(app,"EJS_emulator.play()");
             js(app,"settings.screen='console';settings.fit='contain';settings.orientation='vertical';apply();persist();el('save-shortcut').click()");
+            waitJs(app,"innerHeight>innerWidth && Math.abs(el('game').getBoundingClientRect().width/el('game').getBoundingClientRect().height-1.5)<.05");
+            require("true".equals(js(app,"buttons.A.getBoundingClientRect().top>el('game').getBoundingClientRect().bottom && buttons.D.getBoundingClientRect().top>el('game').getBoundingClientRect().bottom && el('reopen').getBoundingClientRect().top>=el('game').getBoundingClientRect().bottom")),"Portrait controls overlap the game");
+            js(app,"EJS_emulator.pause()");Thread.sleep(1000);capture("portrait.png");js(app,"EJS_emulator.play()");
             // The new on-screen save shortcut creates a checkpoint.
 
             waitJs(app,"!el('load-point').disabled && el('checkpoint-status').textContent.includes('salvo')");
@@ -147,7 +184,14 @@ public class OfflineSmokeRunner extends Instrumentation {
             runOnMainSync(()->app.onActivityResult(13,Activity.RESULT_OK,new Intent().setData(Uri.fromFile(archive))));
             for(int i=0;i<80&&archive.length()<100;i++)Thread.sleep(100);
             Thread.sleep(500);
-            try(java.util.zip.ZipFile z=new java.util.zip.ZipFile(archive)){require(z.getEntry("point-0.json")!=null,"Checkpoint missing from export");}
+            try(java.util.zip.ZipFile z=new java.util.zip.ZipFile(archive)){require(z.getEntry("point-0.json")!=null,"Checkpoint missing from export");
+                try(java.io.InputStream input=z.getInputStream(z.getEntry("backup.json"))){
+                    java.io.ByteArrayOutputStream bytes=new java.io.ByteArrayOutputStream();byte[] buffer=new byte[8192];int n;
+                    while((n=input.read(buffer))!=-1)bytes.write(buffer,0,n);
+                    org.json.JSONObject saves=new org.json.JSONObject(bytes.toString("UTF-8")).getJSONObject("saves");
+                    String name="mGBA/"+new org.json.JSONObject(app.new Bridge().info()).getString("id")+".srm";
+                    require(android.util.Base64.decode(saves.getString(name),0)[0]==90,"Cartridge save missing from exported backup");
+                }}
             js(app,"window.erased=false;historyDb().then(db=>{const tx=db.transaction('history','readwrite');tx.objectStore('history').clear();tx.oncomplete=()=>{db.close();window.erased=true}})");
             waitJs(app,"window.erased");
             runOnMainSync(()->app.onActivityResult(14,Activity.RESULT_OK,new Intent().setData(Uri.fromFile(archive))));
