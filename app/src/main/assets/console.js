@@ -8,6 +8,7 @@ settings.positions=settings.positions||{};settings.sizes=settings.sizes||{};
 settings.theme=read('fire-game-theme',settings.theme);delete settings.accent;
 // Older floating shortcuts had unrelated positions; align just those once.
 if(settings.toolsVersion!==2){for(const layout of Object.values(settings.positions))for(const id of ['reopen','speed-button','restore-shortcut','save-shortcut'])delete layout[id];settings.toolsVersion=2;persist();}
+if(isDS&&settings.dsScreenVersion!==1){settings.dsMode='single';settings.dsActive='top';settings.screen='full';settings.focus=true;settings.dsScreenVersion=1;persist();}
 const emulator=()=>window.EJS_emulator;
 const say=text=>{el('status').textContent=text};
 function persist(){write(profileKey,settings)}
@@ -113,7 +114,7 @@ editorHead.onpointerdown=event=>{if(event.target.closest('button'))return;event.
 editorHead.onpointermove=event=>{if(!editorDrag||!editorHead.hasPointerCapture(event.pointerId))return;const r=editor.getBoundingClientRect();editor.style.left=Math.max(4,Math.min(innerWidth-r.width-4,event.clientX-editorDrag[0]))+'px';editor.style.top=Math.max(4,Math.min(innerHeight-r.height-4,event.clientY-editorDrag[1]))+'px';editor.style.bottom='auto';editor.style.transform='none';};
 editorHead.onlostpointercapture=()=>{editorDrag=null;};
 let selectedControl='A';
-const controlNames={D:'Direcional',A:'Botão A',B:'Botão B',X:'Botão X',Y:'Botão Y',Mic:'Microfone',L:'Botão L',R:'Botão R',Select:'Select',Start:'Start','speed-button':'Velocidade','reopen':'Configurações','restore-shortcut':'Voltar ao save','save-shortcut':'Salvar jogo'};
+const controlNames={D:'Direcional',A:'Botão A',B:'Botão B',X:'Botão X',Y:'Botão Y',Mic:'Microfone',L:'Botão L',R:'Botão R',Select:'Select',Start:'Start','speed-button':'Velocidade','reopen':'Configurações','restore-shortcut':'Voltar ao save','save-shortcut':'Salvar jogo','ds-swap':'Alternar telas DS','ds-popup':'Janela DS'};
 function scaleFor(id){const value=Number(settings.sizes[id]);return Math.max(.6,Math.min(2,Number.isFinite(value)&&value?value/100:1));}
 function selectedElement(){return buttons[selectedControl]||el(selectedControl);}
 function selectControl(id){selectedControl=id;editorSelect.value=id;resizeInput.value=Math.round(scaleFor(id)*100);resizeValue.value=resizeInput.value+'%';resizeValue.textContent=resizeInput.value+'%';resizeInput.setAttribute('aria-label','Tamanho de '+controlNames[id]);document.querySelectorAll('.selected-control').forEach(b=>b.classList.remove('selected-control'));selectedElement()?.classList.add('selected-control');}
@@ -135,6 +136,7 @@ setting('preset','Posição dos botões',choices('classic|Clássica','left|Canho
 setting('theme','Tema completo',Object.entries(themes).map(([id,theme])=>[id,theme.name]));
 setting('orientation','Orientação',choices('auto|Automática','vertical|Em pé','horizontal|Deitado'));
 setting('screen','Área do jogo',choices('console|Console · espaço para controles','full|Tela inteira · controles sobre o jogo'));
+if(isDS){setting('dsMode','Telas do Nintendo DS',choices('single|Uma tela ampliada','overlay|Segunda tela em janela','dual|Duas telas lado a lado / empilhadas'));setting('dsWindowSize','Tamanho da janela DS',[18,45,1],'range');}
 setting('fit','Enquadramento',isDS?choices('contain|Proporção original'):choices('contain|Proporção original','cover|Preencher com corte','fill|Esticar'));
 setting('filter','Imagem',choices('original|Original','lcd|LCD','crt|CRT','mono|Monocromática','warm|Quente'));
 setting('brightness','Brilho da imagem',[50,150,5],'range');setting('saturation','Intensidade das cores',[0,170,5],'range');
@@ -160,7 +162,7 @@ for(const id of ['reopen','settings-toggle']){
  button.setAttribute('aria-label','Configurações do jogo');
  button.setAttribute('aria-controls','settings-panel');button.setAttribute('aria-expanded','false');
 }
-addCategory('Tela e vídeo','screen',['pref-screen','pref-focus','pref-orientation','pref-fit','pref-filter','sharp-image','pref-brightness','pref-saturation']);
+addCategory('Tela e vídeo','screen',[...(isDS?['pref-dsMode','pref-dsWindowSize']:[]),'pref-screen','pref-focus','pref-orientation','pref-fit','pref-filter','sharp-image','pref-brightness','pref-saturation']);
 addCategory('Áudio','sound',['pref-volume','pref-mute']);
 addCategory('Controles','controller',['pref-shortcut','pref-saveShortcut','pref-skin','pref-preset','control-size','control-opacity','show-controls','pref-haptic','pref-swap','pref-diagonal'],[move,reset]);
 addCategory('Aparência e acessibilidade','palette',['pref-theme','pref-contrast','pref-bigtext']);
@@ -179,6 +181,7 @@ const speedButton=el('speed-button');
 const restoreShortcut=action('',()=>useCheckpoint(false));restoreShortcut.append(sectionIcon('restore'));restoreShortcut.id='restore-shortcut';restoreShortcut.setAttribute('aria-label','Voltar ao save');document.body.append(restoreShortcut);
 const saveShortcut=action('',()=>useCheckpoint(true));saveShortcut.id='save-shortcut';saveShortcut.append(sectionIcon('backup'));saveShortcut.setAttribute('aria-label','Salvar jogo');document.body.append(saveShortcut);
 const floats=[el('reopen'),speedButton,restoreShortcut,saveShortcut];
+initDSDisplay();
 function placeTools(){
  const visible=floats.filter(button=>!button.hidden);
  const widths=visible.map(button=>46*scaleFor(button.id));
@@ -270,25 +273,20 @@ function updateCanvasCrop(){
  canvas.style.setProperty('--crop-y',Math.max(1,aspect/bufferAspect));
  if(observedCanvas!==canvas){observedCanvas=canvas;new MutationObserver(updateCanvasCrop).observe(canvas,{attributes:true,attributeFilter:['width','height']});}
 }
-let dsLayout='';
 function apply(){
  applyTheme(settings.theme);write('fire-game-theme',settings.theme);document.body.dataset.screen=settings.screen;
  for(const key of ['focus','contrast','bigtext'])document.body.classList.toggle(key,!!settings[key]);document.body.classList.toggle('scan',['lcd','crt'].includes(settings.filter));
  const canvas=emulator()?.canvas;if(canvas){canvas.style.setProperty('object-fit',settings.fit==='contain'?'contain':'fill','important');canvas.style.setProperty('image-rendering',el('sharp-image').checked?'pixelated':'auto','important');canvas.style.filter='brightness('+settings.brightness+'%) saturate('+settings.saturation+'%) '+({mono:'grayscale(1)',warm:'sepia(.35)',lcd:'contrast(.9)',crt:'contrast(1.18)'}[settings.filter]||'')}
  Android.orientation(settings.orientation==='vertical'?1:settings.orientation==='horizontal'?2:0);Android.immersive(!!settings.focus);
  const e=emulator();
- if(isDS&&e?.started){
-  const layout=landscape.matches?'left/right':'top/bottom';
-  if(dsLayout!==layout){e.gameManager.setVariable('desmume_screens_layout',layout);dsLayout=layout;}
-  e.gameManager.setVariable('desmume_pointer_type','touch');
- }
+ applyDSDisplay();
  if(e?.started){e.volume=settings.mute?0:settings.volume/100;e.setVolume(e.volume)}
  updateSpeed()
  updateCanvasCrop();place()
 }
 landscape.addEventListener('change',apply);
 el('sharp-image').addEventListener('change',apply);el('control-size').addEventListener('input',place);
-new ResizeObserver(place).observe(deck);new ResizeObserver(updateCanvasCrop).observe(el('game'));apply();
+new ResizeObserver(place).observe(deck);new ResizeObserver(()=>{updateCanvasCrop();applyDSDisplay()}).observe(el('game'));apply();
 function hideEmulatorMenu(){const menu=emulator()?.elements?.menuToggle;if(menu)menu.remove();}
 new MutationObserver(hideEmulatorMenu).observe(el('game'),{childList:true,subtree:true});hideEmulatorMenu();
 window.EJS_onGameStart=()=>{hideEmulatorMenu();refreshCheckpoint();updateMeta(rom.id,{last:Date.now(),sessions:(gameMeta(rom.id).sessions||0)+1});apply();say('Jogando offline');setInterval(()=>{

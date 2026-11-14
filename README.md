@@ -71,3 +71,12 @@ Não adicione jogos, BIOS nem saves pessoais ao git. Eles estão ignorados, e o 
 - O CI instala a versão de teste 13, importa jogos e saves de GBA/DS, atualiza para 14 com `adb install -r` e verifica biblioteca, preferências e save de DS após reinicialização sem cache do navegador.
 - Migração inicial: esta edição instala ao lado da 3.0, cuja chave temporária não está disponível. Exportar o backup na antiga, importar a mesma ROM e o backup na 3.1. Depois disso, os próximos APKs release com a mesma chave atualizam por cima.
 - O APK é completo: instala do zero quando o aplicativo está ausente e atualiza quando presente. Internet não é necessária para jogar.
+
+
+### Fire Game 3.2 — uma tela DS ampliada e segunda tela opcional
+- DS abre inicialmente com a tela superior ampliada e os controles sobre a imagem, preservando a proporção 4:3.
+- Atalho 1↔2 alterna instantaneamente entre tela superior e inferior. A inferior ampliada recebe o toque normal.
+- Atalho de janela mostra a outra tela em uma sobreposição ao vivo. A tela inferior pequena também recebe toque; arraste sua barra para reposicionar e ajuste o tamanho em Tela e vídeo.
+- Tela e vídeo mantém a opção tradicional de duas telas lado a lado / empilhadas. Modo, tela selecionada, tamanho e posição são salvos por jogo.
+- Não existe detecção automática de pedidos de interação: o núcleo não fornece um sinal confiável para isso.
+- Mesmo identificador e certificado permanente da 3.1; versionCode 15. Instalar por cima da 3.1 sem apagar dados.

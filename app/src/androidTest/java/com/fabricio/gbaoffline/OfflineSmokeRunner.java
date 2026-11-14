@@ -78,6 +78,33 @@ public class OfflineSmokeRunner extends Instrumentation {
         Thread.sleep(300);
         expectDsColors(0,2);
     }
+    private void touchDsWindow(MainActivity app) throws Exception {
+        String result=js(app,"JSON.stringify({x:(dsPreview.getBoundingClientRect().left+dsPreview.clientWidth*.5)*devicePixelRatio,y:(dsPreview.getBoundingClientRect().top+dsPreview.clientHeight*.5)*devicePixelRatio})");
+        org.json.JSONObject point=new org.json.JSONObject(new org.json.JSONArray("["+result+"]").getString(0));
+        int[] origin=new int[2];runOnMainSync(()->app.web.getLocationOnScreen(origin));
+        float x=(float)point.getDouble("x")+origin[0],y=(float)point.getDouble("y")+origin[1];
+        long now=android.os.SystemClock.uptimeMillis();
+        android.view.MotionEvent event=android.view.MotionEvent.obtain(now,now,0,x,y,0);event.setSource(android.view.InputDevice.SOURCE_TOUCHSCREEN);getUiAutomation().injectInputEvent(event,true);event.recycle();
+        Thread.sleep(800);expectDsColors(0,1);
+        event=android.view.MotionEvent.obtain(now,android.os.SystemClock.uptimeMillis(),1,x,y,0);event.setSource(android.view.InputDevice.SOURCE_TOUCHSCREEN);getUiAutomation().injectInputEvent(event,true);event.recycle();
+        Thread.sleep(500);expectDsColors(0,2);
+    }
+    private void testDsDisplay(MainActivity app) throws Exception {
+        waitJs(app,"dsLayout==='top only' && settings.screen==='full'");Thread.sleep(700);
+        android.graphics.Bitmap bitmap=getUiAutomation().takeScreenshot();
+        try{require(colorCount(bitmap,0)>10000 && colorCount(bitmap,2)<100,"Single screen did not hide lower screen");}finally{bitmap.recycle();}
+        capture("ds-single.png");
+        js(app,"el('ds-swap').click()");waitJs(app,"dsLayout==='bottom only'");Thread.sleep(700);
+        bitmap=getUiAutomation().takeScreenshot();try{require(colorCount(bitmap,2)>10000 && colorCount(bitmap,0)<100,"Swap did not show lower screen");}finally{bitmap.recycle();}
+        js(app,"el('ds-swap').click();el('ds-popup').click()");waitJs(app,"dsLayout==='top/bottom' && !dsWindow.hidden");Thread.sleep(1000);
+        expectDsColors(0,2);capture("ds-overlay-wide.png");touchDsWindow(app);
+        js(app,"settings.orientation='vertical';apply();persist()");waitJs(app,"innerHeight>innerWidth");Thread.sleep(1000);
+        expectDsColors(0,2);capture("ds-overlay-portrait.png");touchDsWindow(app);
+        js(app,"settings.dsWindowPosition=[-20,140];settings.dsWindowSize=40;apply();persist()");
+        require("true".equals(js(app,"dsWindow.getBoundingClientRect().left>=0 && dsWindow.getBoundingClientRect().bottom<=innerHeight")),"Floating DS window escaped viewport");
+        js(app,"dsWindow.querySelector('button').click()");waitJs(app,"dsLayout==='top only' && dsWindow.hidden");
+        js(app,"settings.dsMode='dual';settings.orientation='horizontal';apply();persist()");waitJs(app,"innerWidth>innerHeight && dsLayout==='left/right'");
+    }
     private void testDs(MainActivity app) throws Exception {
         if("ds-reopen".equals(phase)){
             js(app,"window.cleaned=false;var req=indexedDB.deleteDatabase('/data/saves');req.onsuccess=()=>window.cleaned=true");
@@ -93,6 +120,7 @@ public class OfflineSmokeRunner extends Instrumentation {
         runOnMainSync(()->app.onActivityResult(12,Activity.RESULT_OK,new Intent().setData(Uri.fromFile(file))));
         waitJs(app,"window.EJS_emulator?.started && EJS_emulator.gameManager.getFrameNum()>120");
         require("true".equals(js(app,"isDS && EJS_emulator.getCore()==='desmume2015' && innerWidth>innerHeight && !!buttons.X && !!buttons.Y && !!buttons.Mic")),"DS core, layout or controls missing");
+        testDsDisplay(app);
         Thread.sleep(600);expectDsColors(0,2);capture("ds-wide.png");touchDs(app,false);
         js(app,"settings.orientation='vertical';apply();persist()");
         waitJs(app,"innerHeight>innerWidth && dsLayout==='top/bottom'");

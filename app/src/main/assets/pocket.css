@@ -88,3 +88,13 @@ body[data-system=nds] #game canvas{touch-action:none}
  body.focus[data-system=nds][data-screen=console] #game{width:min(100%,calc((100dvh - 310px)*2/3));height:auto}
  body[data-system=nds][data-screen=console] .pad.action{width:48px;height:48px;font-size:20px}
 }
+
+/* A single DS screen retains its 4:3 ratio; the secondary window is movable. */
+body[data-system=nds]:not([data-ds-mode=dual])[data-screen=console] #game{width:100%;aspect-ratio:4/3;height:auto;max-height:calc(100dvh - 310px)}
+#ds-window{position:fixed;z-index:24;border:2px solid var(--line);border-radius:10px;background:var(--panel);box-shadow:0 4px 18px #0008;overflow:hidden}
+#ds-window[hidden]{display:none}
+.ds-window-bar{display:flex;align-items:center;justify-content:space-between;height:28px;padding-left:8px;color:var(--paper);font:600 11px system-ui;touch-action:none;cursor:move}
+.ds-window-bar button{padding:0;width:30px;height:28px;min-height:0;border:0;border-radius:0;background:transparent;color:var(--paper);font:22px system-ui}
+#ds-window canvas{display:block;width:100%;aspect-ratio:4/3;image-rendering:pixelated;touch-action:none}
+#ds-swap,#ds-popup{display:flex;align-items:center;justify-content:center;gap:1px;font:700 11px system-ui}
+#ds-swap svg,#ds-popup svg{width:21px;height:21px}
