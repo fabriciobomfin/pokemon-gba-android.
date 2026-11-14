@@ -59,12 +59,13 @@ public class OfflineSmokeRunner extends Instrumentation {
             require("true".equals(js(app,"document.querySelector('[data-page=themes]').click(); Array.from(el('gallery').children).every(b=>{b.click();return b.getAttribute('aria-pressed')==='true' && document.documentElement.dataset.theme===b.dataset.id && read('fire-game-theme','')===b.dataset.id && (!themes[b.dataset.id].pattern || getComputedStyle(b.firstChild).backgroundImage.includes('gradient'))})")),"Theme gallery selection failed");
             js(app,"document.querySelector('[data-id=ciano]').click();openPage('home')");
             // ARM code: set mode 3, fill VRAM red, then loop. No BIOS/logo/game assets.
-            byte[] rom = new byte[256];
+            byte[] rom = new byte[512];
             ByteBuffer words=ByteBuffer.wrap(rom).order(ByteOrder.LITTLE_ENDIAN);
             words.putInt(0, 0xea00002e); // branch to 0xc0
             rom[0xb2]=(byte)0x96;
-            int[] program={0xe3a00301,0xe3a01b01,0xe2811003,0xe1c010b0,0xe3a00406,0xe3a0101f,0xe3a02c96,0xe0c010b2,0xe2522001,0x1afffffc,0xeafffffe};
+            int[] program={0xe3a00301,0xe3a01b01,0xe2811003,0xe1c010b0,0xe3a00406,0xe3a0101f,0xe3a02c96,0xe0c010b2,0xe2522001,0x1afffffc,0xe3a03301,0xe2833e13,0xe1d340b0,0xe3140001,0x1afffffc,0xe3a0540e,0xe3a0605a,0xe5c56000,0xeafffff8};
             for(int n=0;n<program.length;n++)words.putInt(0xc0+n*4,program[n]);
+            System.arraycopy("SRAM_V113".getBytes("US-ASCII"),0,rom,400,9);
             File file = new File(getTargetContext().getCacheDir(), "offline-smoke.gba");
             try(FileOutputStream out=new FileOutputStream(file)){out.write(rom);}
             // Exercise exactly the import callback used by ACTION_OPEN_DOCUMENT.
@@ -84,6 +85,13 @@ public class OfflineSmokeRunner extends Instrumentation {
             }
             require(redPixels>1000,"Expected red homebrew framebuffer, found " + redPixels + " red pixels");
             screenshot.recycle();
+            js(app,"EJS_emulator.gameManager.simulateInput(0,8,1)");
+            Thread.sleep(400);
+            js(app,"EJS_emulator.gameManager.simulateInput(0,8,0);saveGame(false)");
+            Thread.sleep(1500);
+            android.util.Log.i("FireGameBattery",js(app,"JSON.stringify({path:EJS_emulator.gameManager.getSaveFilePath(),tree:EJS_emulator.gameManager.FS.readdir('/data/saves'),battery:EJS_emulator.gameManager.getSaveFile(false)?.slice(0,8),native:Android.loadFiles()})"));
+            require("true".equals(js(app,"EJS_emulator.gameManager.getSaveFile(false)?.[0]===90")),"ROM cartridge write not flushed to battery file");
+            require("true".equals(js(app,"Object.values(JSON.parse(Android.loadFiles())).some(v=>atob(v).charCodeAt(0)===90)")),"Real cartridge save missing from native storage");
             require("true".equals(js(app,"document.querySelectorAll('#console button.pad').length===7 && document.querySelector('#console .action').getBoundingClientRect().width>30")),"Touch controls missing");
             require("true".equals(js(app,"document.body.classList.contains('focus') && !document.getElementById('app-header').offsetHeight && document.getElementById('speed-button').offsetHeight>=40")), "Fullscreen and speed shortcut missing");
             require("true".equals(js(app,"var speedBtn=document.getElementById('speed-button'); speedBtn.click(); speedBtn.textContent==='2×' && document.getElementById('settings-panel').hidden")), "Direct speed change failed");
