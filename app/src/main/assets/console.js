@@ -1,5 +1,5 @@
 const deck=el('console'),panel=el('settings-panel'),profileKey='pocket:'+rom.id;
-const defaults={focus:true,theme:'ameixa',orientation:'auto',preset:'classic',volume:75,filter:'original',brightness:100,saturation:100,fit:'contain',speed:'1',interval:5,positions:{},haptic:true};
+const defaults={skin:'round',accent:'tema',focus:true,theme:'ameixa',orientation:'auto',preset:'classic',volume:75,filter:'original',brightness:100,saturation:100,fit:'contain',speed:'1',interval:5,positions:{},haptic:true};
 let settings=Object.assign({},defaults,read(profileKey,{})),editing=false,activeSeconds=0;
 const emulator=()=>window.EJS_emulator;
 const say=text=>{el('status').textContent=text};
@@ -12,35 +12,56 @@ function setting(key,label,choices,type='select'){
  field.oninput=()=>{settings[key]=type==='checkbox'?field.checked:type==='range'?+field.value:field.value;persist();apply()};lab.append(field);row.append(lab);panel.append(row)
 }
 const quick=make('div');quick.id='quick';panel.querySelector('.panel-head').after(quick);
-// One transactional checkpoint per ROM, in the app's private WebView storage.
 const checkpoints=new Promise((resolve,reject)=>{
- const request=indexedDB.open('fire-game-checkpoints',1);
- request.onupgradeneeded=()=>request.result.createObjectStore('games');
- request.onsuccess=()=>resolve(request.result);
- request.onerror=()=>reject(request.error);
+ const req=indexedDB.open('fire-game-checkpoints',2);
+ req.onupgradeneeded=()=>{
+  const history=req.result.createObjectStore('history',{keyPath:['game','time']});
+  if(req.result.objectStoreNames.contains('games')){
+   const cursor=req.transaction.objectStore('games').openCursor();
+   cursor.onsuccess=()=>{const c=cursor.result;if(c){history.put({...c.value,game:c.key});c.continue()}};
+  }
+ };
+ req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);
 });
-async function checkpoint(bytes){
+const saveRange=IDBKeyRange.bound([rom.id,0],[rom.id,Number.MAX_SAFE_INTEGER]);
+async function saveQuery(mode,operation){
  const db=await checkpoints;
  return new Promise((resolve,reject)=>{
-  const tx=db.transaction('games',bytes?'readwrite':'readonly');
-  const games=tx.objectStore('games');
-  const request=bytes?games.put({bytes,time:Date.now()},rom.id):games.get(rom.id);
-  tx.oncomplete=()=>resolve(request.result);
-  tx.onabort=()=>reject(tx.error);
+  const tx=db.transaction('history',mode),req=operation(tx.objectStore('history'));
+  tx.oncomplete=()=>resolve(req.result);tx.onabort=()=>reject(tx.error);
  });
+}
+async function checkpoint(){const c=await saveQuery('readonly',s=>s.openCursor(saveRange,'prev'));return c?.value}
+const historyBox=make('dialog');historyBox.id='save-history';document.body.append(historyBox);
+async function historyView(){
+ const keys=await saveQuery('readonly',s=>s.getAllKeys(saveRange));historyBox.replaceChildren(make('h2','Todos os saves'));
+ for(const key of keys.reverse()){
+  const item=await saveQuery('readonly',s=>s.get(key));if(!item)continue;
+  const title=item.name||new Date(item.time).toLocaleString('pt-BR');
+  const row=action(title,()=>{if(!longPress){historyBox.close();useCheckpoint(false,key)}});
+  if(item.picture){const img=make('img');img.src=item.picture;img.alt='';row.prepend(img)}
+  let timer,longPress=false;
+  function manage(){longPress=true;historyBox.replaceChildren(make('h2','Editar save'));const field=make('input');field.value=title;field.maxLength=80;field.setAttribute('aria-label','Nome do save');historyBox.append(field,action('Renomear',async()=>{item.name=field.value.trim();await saveQuery('readwrite',s=>s.put(item));historyView()}),action('Apagar',async()=>{if(confirm('Apagar este save?')){await saveQuery('readwrite',s=>s.delete(key));hasCheckpoint=!!await checkpoint();refreshCheckpoint();feedback.textContent=hasCheckpoint?'Save disponível.':'Nenhum ponto salvo.'}historyView()}),action('Voltar',historyView))}
+  row.oncontextmenu=e=>{e.preventDefault();clearTimeout(timer);manage()};
+  row.onpointerdown=()=>{longPress=false;timer=setTimeout(manage,550)};
+  row.onpointerup=row.onpointercancel=row.onpointerleave=()=>clearTimeout(timer);
+  historyBox.append(row);
+ }
+ if(!keys.length)historyBox.append(make('p','Nenhum save para este jogo.'));
+ historyBox.append(action('Fechar',()=>historyBox.close()));if(!historyBox.open)historyBox.showModal();
 }
 const saveButton=action('Salvar jogo',()=>useCheckpoint(true));
 const loadButton=action('Voltar ao save',()=>useCheckpoint(false));
 saveButton.id='save-point';loadButton.id='load-point';
 saveButton.prepend(sectionIcon('backup'));loadButton.prepend(sectionIcon('restore'));
 const feedback=make('small');feedback.id='checkpoint-status';feedback.setAttribute('role','status');
-quick.append(saveButton,loadButton,feedback);
+const allButton=action("Todos os saves",historyView);allButton.id="all-points";quick.append(saveButton,loadButton,allButton,feedback);
 let hasCheckpoint=false,checkpointBusy=false;
 function refreshCheckpoint(){
  saveButton.disabled=checkpointBusy||!emulator()?.started;
- loadButton.disabled=saveButton.disabled||!hasCheckpoint;
+ loadButton.disabled=saveButton.disabled||!hasCheckpoint;const shortcut=el('restore-shortcut');if(shortcut)shortcut.disabled=loadButton.disabled;
 }
-async function useCheckpoint(saving){
+async function useCheckpoint(saving,key){
  const e=emulator();
  if(checkpointBusy||!e?.started)return;
  checkpointBusy=true;refreshCheckpoint();
@@ -48,10 +69,13 @@ async function useCheckpoint(saving){
   if(saving){
    const bytes=e.gameManager.getState();
    if(!bytes?.byteLength)throw Error();
-   await checkpoint(bytes);hasCheckpoint=true;
+   const time=Date.now();
+   const imageBytes=await e.gameManager.screenshot();
+   const picture='data:image/png;base64,'+toBase64(imageBytes);
+   await saveQuery('readwrite',s=>s.add({game:rom.id,time,bytes,picture}));hasCheckpoint=true;
    feedback.textContent='Jogo salvo neste aparelho.';
   }else{
-   const point=await checkpoint();
+   const point=key?await saveQuery("readonly",s=>s.get(key)):await checkpoint();
    if(!point?.bytes?.byteLength)throw Error();
    e.gameManager.loadState(point.bytes);
    feedback.textContent='Save restaurado.';toggleSettings(false);
@@ -69,6 +93,9 @@ const library=action('Biblioteca',()=>leaveGame());
 const move=action('Mover controles',()=>{const box=el('show-controls');if(!box.checked)box.click();editing=true;document.body.classList.add('editing');toggleSettings(false);editDone.hidden=false;say('Arraste os controles e toque em Concluir')});
 const editDone=action('Concluir',()=>{editing=false;document.body.classList.remove('editing');editDone.hidden=true;persist();say('Posições salvas')});editDone.style.cssText='position:absolute;z-index:23;top:2px;left:42%';editDone.hidden=true;document.body.append(editDone);
 const choices=(...items)=>items.map(item=>item.split('|'));
+setting('shortcut','Botão Voltar ao save na tela',[],'checkbox');
+setting('skin','Design do controle',choices('round|Disco','cross|Cruz clássica','arcade|Arcade'));
+setting('accent','Cor dos botões',choices('tema|Do tema','#ff756d|Coral','#80bfff|Azul','#ce96ff|Violeta','#89df93|Verde','#ffcc61|Dourado','#ffffff|Branco'));
 setting('preset','Posição dos botões',choices('classic|Clássica','left|Canhoto','compact|Compacta'));
 setting('theme','Cor do console',choices('ameixa|Ameixa','brasa|Brasa','jade|Jade','noite|Meia-noite'));
 setting('orientation','Orientação',choices('auto|Automática','vertical|Em pé','horizontal|Deitado'));
@@ -99,13 +126,33 @@ for(const id of ['reopen','settings-toggle']){
 }
 addCategory('Vídeo','screen',['pref-focus','pref-orientation','pref-fit','pref-filter','sharp-image','pref-brightness','pref-saturation']);
 addCategory('Áudio','sound',['pref-volume','pref-mute']);
-addCategory('Controles','controller',['pref-preset','control-size','control-opacity','show-controls','pref-haptic','pref-swap','pref-diagonal'],[move,reset]);
-addCategory('Aparência e acessibilidade','palette',['pref-theme','pref-contrast','pref-bigtext']);
+addCategory('Controles','controller',['pref-shortcut','pref-skin','pref-preset','control-size','control-opacity','show-controls','pref-haptic','pref-swap','pref-diagonal'],[move,reset]);
+addCategory('Aparência e acessibilidade','palette',['pref-theme','pref-accent','pref-contrast','pref-bigtext']);
 addCategory('Avançado','sliders',['pref-interval','pref-clock','pref-timer'],[library,restart]);
 const speedButton=el('speed-button');
+const restoreShortcut=action('↶',()=>useCheckpoint(false));restoreShortcut.id='restore-shortcut';restoreShortcut.setAttribute('aria-label','Voltar ao save');document.body.append(restoreShortcut);
+const floats=[speedButton,el('reopen'),restoreShortcut];
+function placeTools(){
+ floats.forEach((b,i)=>{
+  const pos=settings.positions[keyLayout()]?.[b.id];
+  const x=pos?innerWidth*pos[0]/100:innerWidth/2+[-27,27,81][i];
+  const y=pos?innerHeight*pos[1]/100:27;
+  b.style.setProperty('left',Math.max(26,Math.min(innerWidth-26,x))+'px','important');
+  b.style.setProperty('top',Math.max(24,Math.min(innerHeight-24,y))+'px','important');
+ });
+}
+for(const b of floats){
+ b.classList.add('floating-tool');
+ b.addEventListener('click',e=>{if(editing){e.preventDefault();e.stopImmediatePropagation()}},true);
+ b.onpointerdown=e=>{if(editing)b.setPointerCapture(e.pointerId)};
+ b.onpointermove=e=>{if(!editing||!b.hasPointerCapture(e.pointerId))return;
+ const group=settings.positions[keyLayout()]||(settings.positions[keyLayout()]={});
+ group[b.id]=[100*e.clientX/innerWidth,100*e.clientY/innerHeight];placeTools()};
+}
 function updateSpeed(){
- const host=settings.focus?document.body:document.querySelector('.toolbar');
- if(speedButton.parentElement!==host)host.prepend(speedButton);
+ restoreShortcut.hidden=!settings.shortcut;document.body.dataset.skin=settings.skin;
+ document.body.dataset.fit=settings.fit;
+ if(settings.accent!=='tema')document.documentElement.style.setProperty('--accent',settings.accent);
  const speed=Number(settings.speed);
  speedButton.textContent=speed+'×';
  speedButton.setAttribute('aria-label','Velocidade '+speed+'×. Toque para mudar.');
@@ -119,6 +166,7 @@ const buttons={},held=new Map(),visits=new Map();
 function inputs(pointer,next){const old=held.get(pointer)||[];held.set(pointer,next);const gm=emulator()?.gameManager;if(!gm)return;for(const n of new Set([...old,...next])){const now=[...held.values()].some(list=>list.includes(n));if(visits.get(n)!==now){gm.simulateInput(0,n,now?1:0);visits.set(n,now)}}if(!next.length)held.delete(pointer)}
 function keyLayout(){return (landscape.matches?'wide':'tall')+settings.preset}
 function place(){
+ placeTools();
  let points=landscape.matches?[[10,56],[94,52],[85,68],[9,16],[91,16],[7,88],[93,88]]:[[22,52],[85,43],[69,58],[16,16],[84,16],[40,83],[60,83]];
  ids.forEach((id,i)=>{let [x,y]=points[i];if(settings.preset==='left')x=100-x;if(settings.preset==='compact'){y=50+(y-50)*.78;x=x<50?x+2:x-2}
  const saved=settings.positions[keyLayout()]?.[id];if(saved)[x,y]=saved;const b=buttons[id],rect=deck.getBoundingClientRect(),scale=Number(el('control-size').value)/100;

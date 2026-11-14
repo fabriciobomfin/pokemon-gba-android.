@@ -18,3 +18,12 @@
 .pad.cross span{position:absolute;font:700 24px/1 system-ui;pointer-events:none;color:var(--paper)}
 .pad.cross [data-code="4"]{top:6%}.pad.cross [data-code="5"]{bottom:6%}.pad.cross [data-code="6"]{left:8%}.pad.cross [data-code="7"]{right:8%}
 .pad.cross .lit{color:var(--accent);text-shadow:0 0 8px var(--accent)}.pad.cross.pressed{filter:none}.pad.cross:after{content:"";width:15%;height:15%;border-radius:50%;background:var(--line)}
+
+#save-point{grid-row:1/3}#all-points{grid-column:2}
+#save-history{width:min(92vw,420px)}#save-history button{display:flex;width:100%;gap:12px;align-items:center;margin:6px 0;text-align:left}#save-history img{width:80px;aspect-ratio:3/2;image-rendering:pixelated}#save-history input{width:100%}
+body .floating-tool,body:not(.focus) #speed-button,body #reopen{display:grid;place-items:center;position:fixed!important;right:auto;transform:translate(-50%,-50%);width:48px;height:44px;z-index:22;touch-action:none}.floating-tool[hidden]{display:none!important}#settings-toggle{display:none}.editing #console~button:not(.floating-tool){top:auto!important;bottom:1px}
+body[data-skin=cross] .pad.cross{border-radius:14%;background:linear-gradient(90deg,transparent 31%,var(--line) 31% 69%,transparent 69%),linear-gradient(transparent 31%,var(--line) 31% 69%,transparent 69%);border:0}
+body[data-skin=arcade] .pad{border-radius:12px;box-shadow:inset 0 -5px 0 #0005}body[data-skin=arcade] .cross{background:var(--panel);border:3px solid var(--accent)}
+#game{overflow:hidden}body[data-fit=cover] #game canvas,body[data-fit=fill] #game canvas{position:absolute!important;left:50%!important;top:50%!important;max-width:none!important;max-height:none!important;transform:translate(-50%,-50%)!important}
+body[data-fit=cover] #game canvas{width:max(100cqw,150cqh)!important;height:max(100cqh,66.667cqw)!important}body[data-fit=fill] #game canvas{width:100%!important;height:100%!important}#game .ejs_canvas_parent{container-type:size}
+.ejs_virtualGamepad_center,.ejs_virtualGamepad_button,.ejs_menu_button,.ejs_virtualGamepad{display:none!important}
