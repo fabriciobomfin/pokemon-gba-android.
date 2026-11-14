@@ -98,6 +98,20 @@ public class OfflineSmokeRunner extends Instrumentation {
             }
             js(app,"leaveGame();true");
             waitJs(app,"!!document.getElementById('continue') && !document.getElementById('saved').hidden");
+            // Export via the production document callback, erase the local records, then import.
+            js(app,"el('exp').click()");
+            Thread.sleep(1500);
+            getUiAutomation().executeShellCommand("input keyevent 4").close();
+            File archive=new File(getTargetContext().getCacheDir(),"transfer.zip");
+            runOnMainSync(()->app.onActivityResult(13,Activity.RESULT_OK,new Intent().setData(Uri.fromFile(archive))));
+            for(int i=0;i<80&&archive.length()<100;i++)Thread.sleep(100);
+            Thread.sleep(500);
+            try(java.util.zip.ZipFile z=new java.util.zip.ZipFile(archive)){require(z.getEntry("point-0.json")!=null,"Checkpoint missing from export");}
+            js(app,"window.erased=false;historyDb().then(db=>{const tx=db.transaction('history','readwrite');tx.objectStore('history').clear();tx.oncomplete=()=>{db.close();window.erased=true}})");
+            waitJs(app,"window.erased");
+            runOnMainSync(()->app.onActivityResult(14,Activity.RESULT_OK,new Intent().setData(Uri.fromFile(archive))));
+            js(app,"window.recovered=false;window.checkRecovery=setInterval(async()=>{const db=await historyDb();const count=await query(db,s=>s.count());db.close();if(count){clearInterval(checkRecovery);window.recovered=true}},200)");
+            waitJs(app,"window.recovered");
             js(app,"Android.play();true");
             waitJs(app,"!!(window.EJS_emulator && EJS_emulator.started && EJS_emulator.gameManager && EJS_emulator.gameManager.getFrameNum()>60)");
             require("true".equals(js(app,"Array.from(EJS_emulator.gameManager.FS.readFile('/data/saves/offline-test')).join(',')==='11,22,33'")),"Save persistence failed");

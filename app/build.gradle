@@ -3,11 +3,11 @@ android {
     namespace 'com.fabricio.gbaoffline'
     compileSdk 35
     defaultConfig {
-        applicationId 'com.fabricio.firegame'
+        applicationId 'com.fabricio.firegame.portable'
         minSdk 24
         targetSdk 35
-        versionCode 7
-        versionName '2.4'
+        versionCode 8
+        versionName '2.5'
         testInstrumentationRunner 'com.fabricio.gbaoffline.OfflineSmokeRunner'
     }
     compileOptions {

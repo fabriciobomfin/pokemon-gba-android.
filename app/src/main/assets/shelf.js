@@ -1,8 +1,39 @@
 const info=JSON.parse(Android.info()),games=JSON.parse(Android.library());
-el('help').onclick=()=>{show('Como jogar');detail.append(make('p','Importe uma ROM .gba ou um ZIP e toque em Jogar. A partida abre em tela cheia. Toque em 1× para alternar a velocidade.'),make('p','Na engrenagem, toque em Salvar jogo. Voltar ao save recupera aquele instante. Para exportar o progresso gravado pelo menu original do cartucho, abra Mais e escolha Backup do último jogo.'))};
+el('help').onclick=()=>{show('Como jogar');detail.append(make('p','Importe uma ROM .gba ou um ZIP e toque em Jogar. A partida abre em tela cheia. Toque em 1× para alternar a velocidade.'),make('p','Na engrenagem, toque em Salvar jogo. Voltar ao save recupera aquele instante. Para exportar os pontos de save e o progresso do cartucho, abra Mais e escolha Backup do último jogo.'))};
 el('import').onclick=()=>Android.pick();el('continue').onclick=()=>Android.play();
 el('saved').hidden=el('tools').hidden=el('progress').hidden=!info.available;
-el('exp').onclick=()=>Android.backup(true);
+function historyDb(){
+ return new Promise((resolve,reject)=>{
+  const req=indexedDB.open('fire-game-checkpoints',2);
+  req.onupgradeneeded=()=>{const history=req.result.createObjectStore('history',{keyPath:['game','time']});
+   if(req.result.objectStoreNames.contains('games')){const cursor=req.transaction.objectStore('games').openCursor();cursor.onsuccess=()=>{const c=cursor.result;if(c){history.put({...c.value,game:c.key});c.continue()}}}};
+  req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);
+ });
+}
+function query(db,fn){return new Promise((resolve,reject)=>{const req=fn(db.transaction('history').objectStore('history'));req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error)})}
+async function exportPoints(){
+ const db=await historyDb();
+ try{
+  const keys=await query(db,s=>s.getAllKeys(IDBKeyRange.bound([info.id,0],[info.id,Number.MAX_SAFE_INTEGER])));
+  for(const [i,key] of keys.entries()){
+   const item=await query(db,s=>s.get(key));let raw='';
+   for(let n=0;n<item.bytes.length;n+=8192)raw+=String.fromCharCode(...item.bytes.subarray(n,n+8192));
+   if(!Android.stagePoint(i,JSON.stringify({...item,bytes:btoa(raw)})))throw Error();
+  }
+  if(!keys.length && !Object.keys(JSON.parse(Android.loadFiles())).length){Android.finishBackup('Nenhum save neste jogo.');return}
+  Android.exportPoints(keys.length);
+ }finally{db.close()}
+}
+el('exp').onclick=()=>exportPoints().catch(()=>Android.finishBackup('Falha ao preparar backup.'));
+async function restorePoints(count,id){
+ let db;
+ try{
+  if(id!==info.id)throw Error();db=await historyDb();
+  await new Promise((resolve,reject)=>{const tx=db.transaction('history','readwrite');tx.oncomplete=resolve;tx.onabort=()=>reject(tx.error);
+   try{for(let i=0;i<count;i++){const item=JSON.parse(Android.staged(i));if(item.game!==id||!Number.isSafeInteger(item.time)||typeof item.bytes!=='string'||!item.bytes)throw Error();item.bytes=Uint8Array.from(atob(item.bytes),c=>c.charCodeAt(0));tx.objectStore('history').put(item)}}catch(e){tx.abort();reject(e)}
+  });Android.finishBackup('Backup restaurado: '+count+' pontos de save.');
+ }catch{Android.finishBackup('Falha ao restaurar os pontos de save.')}finally{db?.close()}
+}
 el('imp').onclick=()=>{if(confirm('Restaurar o progresso do último jogo usando um backup?'))Android.backup(false)};
 const dialog=el('modal'),detail=el('detail');
 el('close').onclick=()=>dialog.close();
