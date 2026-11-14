@@ -235,7 +235,7 @@ public class MainActivity extends Activity {
         String[] parts = name.split("/", -1);
         if (parts.length > 4) return false;
         for (String part : parts) {
-            if (!part.matches("[a-zA-Z0-9._-]{1,160}") || part.equals(".") || part.equals("..")) return false;
+            if (!part.matches("[a-zA-Z0-9._ -]{1,160}") || part.equals(".") || part.equals("..")) return false;
         }
         return true;
     }

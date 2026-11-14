@@ -1,4 +1,5 @@
 const deck=el('console'),panel=el('settings-panel'),profileKey='pocket:'+rom.id;
+deck.setAttribute('aria-label',isDS?'Controle Nintendo DS':'Controle GBA');
 const defaults={skin:'round',accent:'tema',focus:true,theme:'ameixa',orientation:'horizontal',preset:'classic',volume:75,filter:'original',brightness:100,saturation:100,fit:'contain',speed:'1',interval:1,positions:{},sizes:{},screen:'console',haptic:true};
 let settings=Object.assign({},defaults,read(profileKey,{})),editing=false,activeSeconds=0;
 settings.orientation='horizontal';
@@ -163,7 +164,17 @@ addCategory('Tela e vídeo','screen',['pref-screen','pref-focus','pref-orientati
 addCategory('Áudio','sound',['pref-volume','pref-mute']);
 addCategory('Controles','controller',['pref-shortcut','pref-saveShortcut','pref-skin','pref-preset','control-size','control-opacity','show-controls','pref-haptic','pref-swap','pref-diagonal'],[move,reset]);
 addCategory('Aparência e acessibilidade','palette',['pref-theme','pref-contrast','pref-bigtext']);
-addCategory('Avançado','sliders',['pref-interval','pref-clock','pref-timer'],[library,restart]);
+const dsActions=[];
+if(isDS){
+ const lid=action('Abrir/fechar tampa do DS',()=>{
+  const game=emulator()?.gameManager;if(!game||!emulator().started)return;
+  lid.disabled=true;game.simulateInput(0,12,1);
+  setTimeout(()=>game.simulateInput(0,12,0),100);
+  setTimeout(()=>{lid.disabled=false;},1000);
+ });
+ lid.id='ds-lid';dsActions.push(lid);
+}
+addCategory('Avançado','sliders',['pref-interval','pref-clock','pref-timer'],[...dsActions,library,restart]);
 const speedButton=el('speed-button');
 const restoreShortcut=action('',()=>useCheckpoint(false));restoreShortcut.append(sectionIcon('restore'));restoreShortcut.id='restore-shortcut';restoreShortcut.setAttribute('aria-label','Voltar ao save');document.body.append(restoreShortcut);
 const saveShortcut=action('',()=>useCheckpoint(true));saveShortcut.id='save-shortcut';saveShortcut.append(sectionIcon('backup'));saveShortcut.setAttribute('aria-label','Salvar jogo');document.body.append(saveShortcut);

@@ -68,10 +68,12 @@ public class OfflineSmokeRunner extends Instrumentation {
         float x=(float)point.getDouble("x")+origin[0],y=(float)point.getDouble("y")+origin[1];
         long down=android.os.SystemClock.uptimeMillis();
         android.view.MotionEvent press=android.view.MotionEvent.obtain(down,down,0,x,y,0);
+        press.setSource(android.view.InputDevice.SOURCE_TOUCHSCREEN);
         getUiAutomation().injectInputEvent(press,true);press.recycle();
         Thread.sleep(600);
         expectDsColors(0,1);
         android.view.MotionEvent release=android.view.MotionEvent.obtain(down,android.os.SystemClock.uptimeMillis(),1,x,y,0);
+        release.setSource(android.view.InputDevice.SOURCE_TOUCHSCREEN);
         getUiAutomation().injectInputEvent(release,true);release.recycle();
         Thread.sleep(300);
         expectDsColors(0,2);
