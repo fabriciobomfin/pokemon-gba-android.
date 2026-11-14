@@ -1,5 +1,5 @@
-const info=JSON.parse(Android.info()),games=JSON.parse(Android.library());
-el('help').onclick=()=>{show('Como jogar');detail.append(make('p','Importe uma ROM .gba ou um ZIP e toque em Jogar. A partida abre em tela cheia. Toque em 1× para alternar a velocidade.'),make('p','Na engrenagem, toque em Salvar jogo. Voltar ao save recupera aquele instante. Para exportar os pontos de save e o progresso do cartucho, abra Mais e escolha Backup do último jogo.'))};
+const info=JSON.parse(Android.info()),games=JSON.parse(Android.library()),systems=JSON.parse(Android.librarySystems());
+el('help').onclick=()=>{show('Como jogar');detail.append(make('p','Importe uma ROM .gba, .nds ou um ZIP e toque em Jogar. A partida abre em tela cheia. Toque em 1× para alternar a velocidade.'),make('p','Na engrenagem, toque em Salvar jogo. Voltar ao save recupera aquele instante. Para exportar os pontos de save e o progresso do cartucho, abra Mais e escolha Backup do último jogo.'))};
 el('import').onclick=()=>Android.pick();el('continue').onclick=()=>Android.play();
 el('saved').hidden=el('tools').hidden=el('progress').hidden=!info.available;
 function historyDb(){
@@ -50,10 +50,10 @@ function render(){
  const recent=ids.filter(id=>gameMeta(id).last).sort((a,b)=>gameMeta(b).last-gameMeta(a).last).slice(0,5);
  el('recent').hidden=!recent.length;
  el('recent-games').replaceChildren(...recent.map(id=>action(gameMeta(id).name||games[id],()=>Android.select(id))));
- el('game-count').textContent=ids.length+(ids.length===1?' jogo':' jogos');
- const rows=ids.map(id=>({id,...gameMeta(id),name:gameMeta(id).name||games[id]})).filter(g=>g.name.toLocaleLowerCase().includes(q)&&(!el('fav').checked||g.star));
+ for(const [system,label] of [['gba','game-count'],['nds','nds-count']]){const count=ids.filter(id=>(systems[id]||'gba')===system).length;el(label).textContent=count+(count===1?' jogo':' jogos');}
+ const rows=ids.map(id=>({id,...gameMeta(id),name:gameMeta(id).name||games[id]})).filter(g=>g.name.toLocaleLowerCase().includes(q)&&(!el('fav').checked||g.star)&&(!el('system-filter').value||(systems[g.id]||'gba')===el('system-filter').value));
  rows.sort((a,b)=>order==='name'?a.name.localeCompare(b.name,'pt-BR'):order==='time'?(b.seconds||0)-(a.seconds||0):(b.last||0)-(a.last||0));
- for(const g of rows){const row=make('article');row.className='gamecard';const b=action(g.name,()=>Android.select(g.id));b.className='title';b.append(make('small',g.last?'Última sessão · '+new Date(g.last).toLocaleDateString('pt-BR'):'Importado'));const star=action(g.star?'★':'☆',()=>{updateMeta(g.id,{star:!g.star});render()});star.setAttribute('aria-label',g.star?'Remover favorito':'Favoritar');row.append(b,star,action('Detalhes',()=>edit(g.id)));el('list').append(row)}
+ for(const g of rows){const row=make('article');row.className='gamecard';const b=action(g.name,()=>Android.select(g.id));b.className='title';b.append(make('small',(systems[g.id]==='nds'?'Nintendo DS':'GBA')));b.append(make('small',g.last?'Última sessão · '+new Date(g.last).toLocaleDateString('pt-BR'):'Importado'));const star=action(g.star?'★':'☆',()=>{updateMeta(g.id,{star:!g.star});render()});star.setAttribute('aria-label',g.star?'Remover favorito':'Favoritar');row.append(b,star,action('Detalhes',()=>edit(g.id)));el('list').append(row)}
  if(!rows.length)el('list').append(make('p',ids.length?'Nenhum jogo corresponde ao filtro.':'Sua biblioteca começa com a primeira ROM.'))
 }
 el('sort').value=read('shelfSort','recent');el('sort').onchange=()=>{write('shelfSort',el('sort').value);render()};el('search').oninput=el('fav').onchange=render;render();
@@ -74,11 +74,14 @@ for(const [name,icon] of [['home','library'],['categories','controller'],['theme
  button.prepend(sectionIcon(icon));
  button.onclick=()=>openPage(name);
 }
-el('gba-category').prepend(sectionIcon('controller'));
-el('gba-category').onclick=()=>{
- el('search').value='';el('fav').checked=false;render();openPage('home');
- document.querySelector('#home-page h1').scrollIntoView();
-};
+for(const system of ['gba','nds']){
+ el(system+'-category').prepend(sectionIcon('controller'));
+ el(system+'-category').onclick=()=>{
+  el('search').value='';el('fav').checked=false;el('system-filter').value=system;render();openPage('home');
+  document.querySelector('#home-page h1').scrollIntoView();
+ };
+}
+el('system-filter').onchange=render;
 function selectTheme(id){
  applyTheme(id);write('fire-game-theme',id);
  for(const tile of el('gallery').children)tile.setAttribute('aria-pressed',String(tile.dataset.id===id));

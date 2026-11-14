@@ -80,3 +80,11 @@ body[data-screen=console]{background-image:var(--console-surface)}
  body[data-screen=console] .pad.slim{width:68px;height:36px;font-size:13px}
  body[data-screen=console] .pad.cross{width:clamp(110px,30vw,138px);height:clamp(110px,30vw,138px)}
 }
+
+#nds-category{display:grid;gap:8px;text-align:left;padding:20px;width:min(100%,300px);margin-top:12px}#nds-category svg{height:44px;width:44px;color:var(--accent)}
+body[data-system=nds] #game canvas{touch-action:none}
+@media(orientation:portrait){
+ body[data-system=nds][data-screen=console] #game{width:min(100%,calc((100dvh - 370px)*2/3));height:auto;min-height:0;aspect-ratio:2/3;align-self:center}
+ body.focus[data-system=nds][data-screen=console] #game{width:min(100%,calc((100dvh - 310px)*2/3));height:auto}
+ body[data-system=nds][data-screen=console] .pad.action{width:48px;height:48px;font-size:20px}
+}

@@ -112,7 +112,7 @@ editorHead.onpointerdown=event=>{if(event.target.closest('button'))return;event.
 editorHead.onpointermove=event=>{if(!editorDrag||!editorHead.hasPointerCapture(event.pointerId))return;const r=editor.getBoundingClientRect();editor.style.left=Math.max(4,Math.min(innerWidth-r.width-4,event.clientX-editorDrag[0]))+'px';editor.style.top=Math.max(4,Math.min(innerHeight-r.height-4,event.clientY-editorDrag[1]))+'px';editor.style.bottom='auto';editor.style.transform='none';};
 editorHead.onlostpointercapture=()=>{editorDrag=null;};
 let selectedControl='A';
-const controlNames={D:'Direcional',A:'Botão A',B:'Botão B',L:'Botão L',R:'Botão R',Select:'Select',Start:'Start','speed-button':'Velocidade','reopen':'Configurações','restore-shortcut':'Voltar ao save','save-shortcut':'Salvar jogo'};
+const controlNames={D:'Direcional',A:'Botão A',B:'Botão B',X:'Botão X',Y:'Botão Y',Mic:'Microfone',L:'Botão L',R:'Botão R',Select:'Select',Start:'Start','speed-button':'Velocidade','reopen':'Configurações','restore-shortcut':'Voltar ao save','save-shortcut':'Salvar jogo'};
 function scaleFor(id){const value=Number(settings.sizes[id]);return Math.max(.6,Math.min(2,Number.isFinite(value)&&value?value/100:1));}
 function selectedElement(){return buttons[selectedControl]||el(selectedControl);}
 function selectControl(id){selectedControl=id;editorSelect.value=id;resizeInput.value=Math.round(scaleFor(id)*100);resizeValue.value=resizeInput.value+'%';resizeValue.textContent=resizeInput.value+'%';resizeInput.setAttribute('aria-label','Tamanho de '+controlNames[id]);document.querySelectorAll('.selected-control').forEach(b=>b.classList.remove('selected-control'));selectedElement()?.classList.add('selected-control');}
@@ -134,7 +134,7 @@ setting('preset','Posição dos botões',choices('classic|Clássica','left|Canho
 setting('theme','Tema completo',Object.entries(themes).map(([id,theme])=>[id,theme.name]));
 setting('orientation','Orientação',choices('auto|Automática','vertical|Em pé','horizontal|Deitado'));
 setting('screen','Área do jogo',choices('console|Console · espaço para controles','full|Tela inteira · controles sobre o jogo'));
-setting('fit','Enquadramento',choices('contain|Proporção original','cover|Preencher com corte','fill|Esticar'));
+setting('fit','Enquadramento',isDS?choices('contain|Proporção original'):choices('contain|Proporção original','cover|Preencher com corte','fill|Esticar'));
 setting('filter','Imagem',choices('original|Original','lcd|LCD','crt|CRT','mono|Monocromática','warm|Quente'));
 setting('brightness','Brilho da imagem',[50,150,5],'range');setting('saturation','Intensidade das cores',[0,170,5],'range');
 setting('volume','Volume',[0,100,5],'range');
@@ -207,7 +207,7 @@ function updateSpeed(){
  if(e?.started){e.gameManager.setFastForwardRatio(speed);e.gameManager.toggleFastForward(speed>1?1:0)}
 }
 speedButton.onclick=()=>{settings.speed=String(Number(settings.speed)%3+1);persist();updateSpeed()};
-const ids=['D','A','B','L','R','Select','Start'],codes={A:8,B:0,L:10,R:11,Select:2,Start:3};
+const ids=['D','A','B','L','R','Select','Start',...(isDS?['X','Y','Mic']:[])],codes={A:8,B:0,X:9,Y:1,Mic:14,L:10,R:11,Select:2,Start:3};
 const landscape=matchMedia('(orientation: landscape)');
 const buttons={},held=new Map(),visits=new Map();
 function inputs(pointer,next){const old=held.get(pointer)||[];held.set(pointer,next);const gm=emulator()?.gameManager;if(!gm)return;for(const n of new Set([...old,...next])){const now=[...held.values()].some(list=>list.includes(n));if(visits.get(n)!==now){gm.simulateInput(0,n,now?1:0);visits.set(n,now)}}if(!next.length)held.delete(pointer)}
@@ -215,6 +215,7 @@ function keyLayout(){return (landscape.matches?'wide':'tall')+settings.preset}
 function place(){
  placeTools();
  let points=landscape.matches?[[10,56],[94,52],[85,68],[9,16],[91,16],[7,88],[93,88]]:[[23,52],[84,45],[66,60],[16,25],[84,25],[40,85],[60,85]];
+ if(isDS)points=landscape.matches?[[9,55],[96,53],[90,72],[8,18],[92,18],[8,89],[92,89],[90,35],[84,53],[50,89]]:[[23,53],[87,51],[72,69],[16,25],[84,25],[40,88],[60,88],[72,34],[57,51],[50,25]];
  ids.forEach((id,i)=>{let [x,y]=points[i];if(settings.preset==='left')x=100-x;if(settings.preset==='compact'){y=50+(y-50)*.78;x=x<50?x+2:x-2}
  const saved=settings.positions[keyLayout()]?.[id];if(saved)[x,y]=saved;const b=buttons[id],rect=deck.getBoundingClientRect(),scale=Number(el('control-size').value)/100*scaleFor(id);b.style.setProperty('--button-scale',scaleFor(id));
  const limit=(v,size,dim)=>dim?Math.max(size*50/dim,Math.min(100-size*50/dim,v)):v;
@@ -228,7 +229,7 @@ function directionCodes(x,y,diagonal){
  if(diagonal&&Math.min(ax,ay)>.63*Math.max(ax,ay))return [horizontal,vertical];
  return ax>ay?[horizontal]:[vertical];
 }
-for(const id of ids){const b=make('button',id==='D'?'':id);b.className='pad '+(id==='D'?'cross':id==='A'||id==='B'?'action':'slim');b.setAttribute('aria-label',id==='D'?'Direcional':id);deck.append(b);buttons[id]=b;
+for(const id of ids){const b=make('button',id==='D'?'':id==='Mic'?'Mic':id);b.className='pad '+(id==='D'?'cross':['A','B','X','Y'].includes(id)?'action':'slim');b.setAttribute('aria-label',id==='D'?'Direcional':id);deck.append(b);buttons[id]=b;
  if(id==='D'){
   for(const [code,arrow] of [[4,'▴'],[5,'▾'],[6,'◂'],[7,'▸']]){
    const mark=make('span',arrow);mark.dataset.code=code;mark.setAttribute('aria-hidden','true');b.append(mark);
@@ -251,21 +252,30 @@ for(const id of ids){const b=make('button',id==='D'?'':id);b.className='pad '+(i
 let observedCanvas;
 function updateCanvasCrop(){
  const e=emulator(),canvas=e?.canvas;if(!canvas)return;
+ if(isDS)return;
  const aspect=Number(e.gameManager?.getVideoDimensions('aspect'))||1.5;
  const bufferAspect=canvas.width/canvas.height||aspect;
  canvas.style.setProperty('--crop-x',Math.max(1,bufferAspect/aspect));
  canvas.style.setProperty('--crop-y',Math.max(1,aspect/bufferAspect));
  if(observedCanvas!==canvas){observedCanvas=canvas;new MutationObserver(updateCanvasCrop).observe(canvas,{attributes:true,attributeFilter:['width','height']});}
 }
+let dsLayout='';
 function apply(){
  applyTheme(settings.theme);write('fire-game-theme',settings.theme);document.body.dataset.screen=settings.screen;
  for(const key of ['focus','contrast','bigtext'])document.body.classList.toggle(key,!!settings[key]);document.body.classList.toggle('scan',['lcd','crt'].includes(settings.filter));
  const canvas=emulator()?.canvas;if(canvas){canvas.style.setProperty('object-fit',settings.fit==='contain'?'contain':'fill','important');canvas.style.setProperty('image-rendering',el('sharp-image').checked?'pixelated':'auto','important');canvas.style.filter='brightness('+settings.brightness+'%) saturate('+settings.saturation+'%) '+({mono:'grayscale(1)',warm:'sepia(.35)',lcd:'contrast(.9)',crt:'contrast(1.18)'}[settings.filter]||'')}
  Android.orientation(settings.orientation==='vertical'?1:settings.orientation==='horizontal'?2:0);Android.immersive(!!settings.focus);
- const e=emulator();if(e?.started){e.volume=settings.mute?0:settings.volume/100;e.setVolume(e.volume)}
+ const e=emulator();
+ if(isDS&&e?.started){
+  const layout=landscape.matches?'left/right':'top/bottom';
+  if(dsLayout!==layout){e.gameManager.setVariable('desmume_screens_layout',layout);dsLayout=layout;}
+  e.gameManager.setVariable('desmume_pointer_type','touch');
+ }
+ if(e?.started){e.volume=settings.mute?0:settings.volume/100;e.setVolume(e.volume)}
  updateSpeed()
  updateCanvasCrop();place()
 }
+landscape.addEventListener('change',apply);
 el('sharp-image').addEventListener('change',apply);el('control-size').addEventListener('input',place);
 new ResizeObserver(place).observe(deck);new ResizeObserver(updateCanvasCrop).observe(el('game'));apply();
 function hideEmulatorMenu(){const menu=emulator()?.elements?.menuToggle;if(menu)menu.remove();}

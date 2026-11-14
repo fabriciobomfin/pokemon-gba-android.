@@ -17,9 +17,11 @@ import java.util.concurrent.atomic.AtomicReference;
 /** Tests a homebrew that writes cartridge SRAM on A and shows green after a cold boot. */
 public class OfflineSmokeRunner extends Instrumentation {
     private boolean coldBoot;
+    private String phase;
     @Override public void onCreate(Bundle arguments) {
         super.onCreate(arguments);
-        coldBoot = "battery-reopen".equals(arguments.getString("phase"));
+        phase=arguments.getString("phase","");
+        coldBoot = "battery-reopen".equals(phase);
         start();
     }
     private String js(MainActivity activity, String script) throws Exception {
@@ -45,6 +47,75 @@ public class OfflineSmokeRunner extends Instrumentation {
         }finally{bitmap.recycle();}
     }
     private void require(boolean valid, String message) { if (!valid) throw new AssertionError(message); }
+
+    private int colorCount(android.graphics.Bitmap bitmap, int channel) {
+        int count=0;
+        for(int y=0;y<bitmap.getHeight();y+=3)for(int x=0;x<bitmap.getWidth();x+=3){
+            int c=bitmap.getPixel(x,y),r=android.graphics.Color.red(c),g=android.graphics.Color.green(c),b=android.graphics.Color.blue(c);
+            if(channel==0 && r>180 && g<70 && b<70 || channel==1 && g>180 && r<70 && b<70 || channel==2 && b>180 && r<70 && g<70)count++;
+        }
+        return count;
+    }
+    private void expectDsColors(int first,int second) throws Exception {
+        android.graphics.Bitmap bitmap=getUiAutomation().takeScreenshot();
+        try{require(colorCount(bitmap,first)>600 && colorCount(bitmap,second)>600,"DS screen colors missing: "+colorCount(bitmap,first)+","+colorCount(bitmap,second));}
+        finally{bitmap.recycle();}
+    }
+    private void touchDs(MainActivity app, boolean portrait) throws Exception {
+        String result=js(app,"JSON.stringify({x:(el('game').getBoundingClientRect().left+el('game').clientWidth*"+(portrait?".5":".75")+")*devicePixelRatio,y:(el('game').getBoundingClientRect().top+el('game').clientHeight*"+(portrait?".75":".5")+")*devicePixelRatio})");
+        org.json.JSONObject point=new org.json.JSONObject(new org.json.JSONArray("["+result+"]").getString(0));
+        int[] origin=new int[2];runOnMainSync(()->app.web.getLocationOnScreen(origin));
+        float x=(float)point.getDouble("x")+origin[0],y=(float)point.getDouble("y")+origin[1];
+        long down=android.os.SystemClock.uptimeMillis();
+        android.view.MotionEvent press=android.view.MotionEvent.obtain(down,down,0,x,y,0);
+        getUiAutomation().injectInputEvent(press,true);press.recycle();
+        Thread.sleep(600);
+        expectDsColors(0,1);
+        android.view.MotionEvent release=android.view.MotionEvent.obtain(down,android.os.SystemClock.uptimeMillis(),1,x,y,0);
+        getUiAutomation().injectInputEvent(release,true);release.recycle();
+        Thread.sleep(300);
+        expectDsColors(0,2);
+    }
+    private void testDs(MainActivity app) throws Exception {
+        if("ds-reopen".equals(phase)){
+            js(app,"window.cleaned=false;var req=indexedDB.deleteDatabase('/data/saves');req.onsuccess=()=>window.cleaned=true");
+            waitJs(app,"window.cleaned");
+            js(app,"Android.play()");
+            waitJs(app,"window.EJS_emulator?.started && EJS_emulator.gameManager.getFrameNum()>120");
+            Thread.sleep(600);expectDsColors(1,2);
+            capture("ds-reopen.png");
+            return;
+        }
+        File file=new File(getTargetContext().getCacheDir(),"ds-test.nds");
+        try(FileOutputStream out=new FileOutputStream(file)){out.write(NdsTestProgram.create());}
+        runOnMainSync(()->app.onActivityResult(12,Activity.RESULT_OK,new Intent().setData(Uri.fromFile(file))));
+        waitJs(app,"window.EJS_emulator?.started && EJS_emulator.gameManager.getFrameNum()>120");
+        require("true".equals(js(app,"isDS && EJS_emulator.getCore()==='desmume2015' && innerWidth>innerHeight && !!buttons.X && !!buttons.Y && !!buttons.Mic")),"DS core, layout or controls missing");
+        Thread.sleep(600);expectDsColors(0,2);capture("ds-wide.png");touchDs(app,false);
+        js(app,"settings.orientation='vertical';apply();persist()");
+        waitJs(app,"innerHeight>innerWidth && dsLayout==='top/bottom'");
+        Thread.sleep(800);expectDsColors(0,2);touchDs(app,true);capture("ds-portrait.png");
+        js(app,"useCheckpoint(true)");
+        waitJs(app,"!checkpointBusy && hasCheckpoint");
+        js(app,"EJS_emulator.gameManager.simulateInput(0,8,1)");Thread.sleep(400);
+        js(app,"EJS_emulator.gameManager.simulateInput(0,8,0)");
+        waitJs(app,"Object.entries(JSON.parse(Android.loadFiles())).some(([key,value])=>key.endsWith('.dsv')&&atob(value).charCodeAt(0)===90)");
+        js(app,"leaveGame()");
+        waitJs(app,"!!el('nds-count')");
+        require("true".equals(js(app,"el('nds-count').textContent==='1 jogo' && el('game-count').textContent==='1 jogo'")),"Mixed-console library counts incorrect");
+        require("true".equals(js(app,"el('nds-category').click();el('list').querySelectorAll('article').length===1 && el('list').innerText.includes('Nintendo DS')")),"DS category failed");
+        // Full-size DS checkpoints must survive the same export used by the app.
+        js(app,"el('exp').click()");Thread.sleep(2500);
+        getUiAutomation().executeShellCommand("input keyevent 4").close();
+        File archive=new File(getTargetContext().getCacheDir(),"ds-transfer.zip");
+        runOnMainSync(()->app.onActivityResult(13,Activity.RESULT_OK,new Intent().setData(Uri.fromFile(archive))));
+        for(int i=0;i<100;i++){
+            try(java.util.zip.ZipFile zip=new java.util.zip.ZipFile(archive)){
+                require(zip.getEntry("point-0.json")!=null,"DS checkpoint not exported");
+                break;
+            }catch(java.io.IOException error){if(i==99)throw error;Thread.sleep(200);}
+        }
+    }
     @Override public void onStart() {
         Bundle status = new Bundle();
         status.putString("id", "InstrumentationTestRunner");
@@ -58,6 +129,13 @@ public class OfflineSmokeRunner extends Instrumentation {
             activity = (MainActivity)startActivitySync(launch);
             final MainActivity app = activity;
             waitJs(app, "typeof Android!=='undefined' && !!document.getElementById('import')");
+            if(phase.startsWith("ds")){
+                testDs(app);
+                status.putString("stream","DS offline dual-screen, touch, cartridge and checkpoint tests passed.");
+                sendStatus(0,status);
+                Bundle result=new Bundle();result.putString("stream","\nOK (1 test)\n");finish(Activity.RESULT_OK,result);
+                return;
+            }
             if (coldBoot) {
                 // Exclude the browser cache as a source: the Android cartridge file must restore it.
                 js(app,"window.batteryCacheCleared=false;var request=indexedDB.deleteDatabase('/data/saves');request.onsuccess=()=>window.batteryCacheCleared=true");
