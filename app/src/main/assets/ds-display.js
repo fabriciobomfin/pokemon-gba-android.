@@ -3,7 +3,7 @@ let dsLayout='',dsWindow,dsPreview,dsSwap,dsPopup,dsFrame=0,dsPointer=null;
 function initDSDisplay(){
  if(!isDS)return;
  dsSwap=action('',()=>{settings.dsActive=settings.dsActive==='bottom'?'top':'bottom';persist();apply()});
- dsSwap.id='ds-swap';dsSwap.append(sectionIcon('screen'),make('span','1↔2'));dsSwap.title='Alternar tela do DS';
+ dsSwap.id='ds-swap';dsSwap.append(make('span','1↔2'));dsSwap.title='Alternar tela do DS';
  dsPopup=action('',()=>{settings.dsMode=settings.dsMode==='overlay'?'single':'overlay';persist();el('pref-dsMode').value=settings.dsMode;apply()});
  dsPopup.id='ds-popup';dsPopup.append(sectionIcon('screen'),make('span','+'));dsPopup.title='Mostrar ou ocultar segunda tela';
  document.body.append(dsSwap,dsPopup);floats.push(dsSwap,dsPopup);
@@ -17,9 +17,14 @@ function initDSDisplay(){
  bar.onpointerdown=e=>{if(e.target===close)return;e.preventDefault();bar.setPointerCapture(e.pointerId);const r=dsWindow.getBoundingClientRect();drag=[e.clientX-r.left,e.clientY-r.top];};
  bar.onpointermove=e=>{if(!drag||!bar.hasPointerCapture(e.pointerId))return;settings.dsWindowPosition=[100*(e.clientX-drag[0])/innerWidth,100*(e.clientY-drag[1])/innerHeight];positionDSWindow();};
  bar.onlostpointercapture=()=>{drag=null;persist()};
- dsPreview.addEventListener('pointerdown',e=>{if(settings.dsActive==='bottom'||dsPointer!==null)return;e.preventDefault();dsPointer=e.pointerId;dsPreview.setPointerCapture(e.pointerId);forwardDSTouch(e,'touchstart')});
- dsPreview.addEventListener('pointermove',e=>{if(dsPointer===e.pointerId){e.preventDefault();forwardDSTouch(e,'touchmove')}});
- for(const kind of ['pointerup','pointercancel','lostpointercapture'])dsPreview.addEventListener(kind,e=>{if(dsPointer!==e.pointerId)return;forwardDSTouch(e,'touchend');dsPointer=null;});
+ // Forward native touch events directly. Pointer capture can be cancelled by
+ // WebView when a synthetic touch is delivered to the emulator canvas.
+ dsPreview.addEventListener('touchstart',e=>{e.preventDefault();e.stopPropagation();if(settings.dsActive==='bottom'||dsPointer!==null)return;const t=e.changedTouches[0];if(t){dsPointer=t.identifier;forwardDSTouch(t,'touchstart')}},{passive:false});
+ dsPreview.addEventListener('touchmove',e=>{e.preventDefault();e.stopPropagation();const t=Array.from(e.changedTouches).find(t=>t.identifier===dsPointer);if(t)forwardDSTouch(t,'touchmove')},{passive:false});
+ for(const kind of ['touchend','touchcancel'])dsPreview.addEventListener(kind,e=>{e.preventDefault();e.stopPropagation();const t=Array.from(e.changedTouches).find(t=>t.identifier===dsPointer);if(t){forwardDSTouch(t,'touchend');dsPointer=null;}},{passive:false});
+ dsPreview.addEventListener('mousedown',e=>{if(settings.dsActive==='bottom'||dsPointer!==null)return;e.preventDefault();dsPointer='mouse';forwardDSTouch(e,'touchstart')});
+ window.addEventListener('mousemove',e=>{if(dsPointer==='mouse')forwardDSTouch(e,'touchmove')});
+ window.addEventListener('mouseup',e=>{if(dsPointer==='mouse'){forwardDSTouch(e,'touchend');dsPointer=null;}});
  window.addEventListener('blur',releaseDSTouch);
  document.addEventListener('visibilitychange',()=>{if(document.hidden)releaseDSTouch()});
 }

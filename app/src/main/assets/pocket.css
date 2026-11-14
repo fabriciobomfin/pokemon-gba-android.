@@ -98,3 +98,5 @@ body[data-system=nds]:not([data-ds-mode=dual])[data-screen=console] #game{width:
 #ds-window canvas{display:block;width:100%;aspect-ratio:4/3;image-rendering:pixelated;touch-action:none}
 #ds-swap,#ds-popup{display:flex;align-items:center;justify-content:center;gap:1px;font:700 11px system-ui}
 #ds-swap svg,#ds-popup svg{width:21px;height:21px}
+
+#ds-swap{font-size:15px}
