@@ -27,16 +27,31 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Build and lint APK
-        run: gradle assembleDebug lintDebug --no-daemon --stacktrace
+      - name: Build release and two update-test versions
+        run: |
+          gradle assembleDebug -PfireVersionCode=13 --no-daemon --stacktrace
+          mkdir -p app/build/upgrade
+          cp app/build/outputs/apk/debug/app-debug.apk app/build/upgrade/app-baseline.apk
+          gradle assembleDebug assembleRelease lintRelease --no-daemon --stacktrace
+          cp app/build/outputs/apk/debug/app-debug.apk app/build/upgrade/app-upgrade.apk
+          cp "$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" app/build/upgrade/apksigner.jar
       - name: Verify packaged offline assets and absence of ROMs
-        run: python3 tools/verify_apk.py app/build/outputs/apk/debug/app-debug.apk
-      - uses: actions/upload-artifact@v4
-        with:
-          name: GBA-Offline-Android-APK
-          path: app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
-          retention-days: 90
+        run: python3 tools/verify_apk.py app/build/outputs/apk/release/app-release-unsigned.apk
+      - name: Sign release when permanent key is configured
+        env:
+          KEY_BASE64: ${{ secrets.FIREGAME_KEYSTORE_BASE64 }}
+          KEY_PASSWORD: ${{ secrets.FIREGAME_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -n "$KEY_BASE64" ]; then
+            umask 077
+            printf '%s' "$KEY_BASE64" | base64 --decode > "$RUNNER_TEMP/firegame.p12"
+            printf '%s' "$KEY_PASSWORD" > "$RUNNER_TEMP/firegame-password.txt"
+            export FIREGAME_KEYSTORE="$RUNNER_TEMP/firegame.p12"
+            export FIREGAME_PASSWORD_FILE="$RUNNER_TEMP/firegame-password.txt"
+            export APKSIGNER_JAR="$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar"
+            python3 tools/sign_release.py app/build/outputs/apk/release/app-release-unsigned.apk app/build/release/Fire-Game.apk
+            rm "$FIREGAME_KEYSTORE" "$FIREGAME_PASSWORD_FILE"
+          fi
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -60,3 +75,17 @@ jobs:
             app/build/reports/
             app/build/outputs/androidTest-results/
           if-no-files-found: ignore
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Fire-Game-unsigned-for-permanent-signing
+          path: |
+            app/build/outputs/apk/release/app-release-unsigned.apk
+            app/build/upgrade/apksigner.jar
+          if-no-files-found: error
+          retention-days: 90
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Fire-Game-signed-release
+          path: app/build/release/Fire-Game.apk
+          if-no-files-found: ignore
+          retention-days: 90

@@ -17,3 +17,7 @@ __pycache__/
 
 *.nds
 *.dsv
+
+*.p12
+*.pfx
+signing-private/

@@ -4,7 +4,7 @@ Emulador de GBA e Nintendo DS com EmulatorJS 4.2.3, mGBA e DeSmuME 2015 empacota
 
 ## Instalação e jogo
 
-Baixe `app-debug.apk` no artefato **GBA-Offline-Android-APK** da execução verde do GitHub Actions. Instale, toque em **Importar GBA, DS ou ZIP** e selecione seu arquivo .gba, .nds ou ZIP. Não há ROM incluída no aplicativo ou no repositório.
+Use o APK release assinado com a chave permanente. O artefato `Fire-Game-unsigned-for-permanent-signing` é material de compilação e não deve ser instalado ou distribuído antes de assinar. Instale, toque em **Importar GBA, DS ou ZIP** e selecione seu arquivo .gba, .nds ou ZIP. Não há ROM incluída no aplicativo ou no repositório.
 
 Depois de importar, a ROM fica no armazenamento privado do aplicativo. Todos os componentes do emulador já estão no APK; o aplicativo não solicita permissão de Internet e funciona em modo avião desde a primeira abertura. Você pode reabrir a ROM em **Abrir jogo salvo**. Use o menu do próprio jogo para salvar sua aventura; os arquivos de progresso são persistidos no armazenamento privado nativo do Android, separados por ROM, a cada segundo por padrão e ao voltar ao início. Desinstalar o app apaga ROM e progresso.
 
@@ -58,3 +58,16 @@ Não adicione jogos, BIOS nem saves pessoais ao git. Eles estão ignorados, e o 
 - Saves do cartucho DS (.dsv), checkpoints e backups usam o armazenamento nativo por ROM. Checkpoints de DS têm limite maior para acomodar a memória das duas CPUs.
 - O CI executa homebrews originais de GBA e DS. Verifica as duas telas, o toque, a escrita de EEPROM pela ROM e a recuperação após force-stop com o cache de saves do navegador apagado.
 - O desempenho de DS depende do aparelho, do WebView e do jogo; o teste homebrew não representa toda a biblioteca comercial.
+
+
+### Fire Game 3.1 — atualizações sem reinstalação
+- Identificador permanente de produção: `com.fabricio.firegame`. Nunca alterar nas próximas versões.
+- `versionCode` atual: 14. Aumentar em toda atualização publicada; manter os dados e formatos de backup compatíveis.
+- Builds de teste usam `.testbuild` e não são distribuídos. Builds release não usam a chave debug.
+- Certificado público esperado: `tools/signing-certificate.sha256`. O script `tools/sign_release.py` recusa qualquer outra chave.
+- A chave PKCS12 e a senha estão no backup privado **Fire-Game-chave-privada-backup.zip** do proprietário, fora do GitHub. Não gerar outra chave, nem publicar este backup.
+- Para assinar localmente, definir `FIREGAME_KEYSTORE`, `FIREGAME_PASSWORD_FILE` e `APKSIGNER_JAR`, e executar `python3 tools/sign_release.py entrada-unsigned.apk Fire-Game.apk`.
+- Para assinar no Actions, cadastrar `FIREGAME_KEYSTORE_BASE64` e `FIREGAME_KEYSTORE_PASSWORD` como secrets do repositório. Sem eles, o Actions entrega apenas o material não assinado para assinatura privada; nunca substitui por chave temporária.
+- O CI instala a versão de teste 13, importa jogos e saves de GBA/DS, atualiza para 14 com `adb install -r` e verifica biblioteca, preferências e save de DS após reinicialização sem cache do navegador.
+- Migração inicial: esta edição instala ao lado da 3.0, cuja chave temporária não está disponível. Exportar o backup na antiga, importar a mesma ROM e o backup na 3.1. Depois disso, os próximos APKs release com a mesma chave atualizam por cima.
+- O APK é completo: instala do zero quando o aplicativo está ausente e atualiza quando presente. Internet não é necessária para jogar.

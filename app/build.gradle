@@ -3,12 +3,16 @@ android {
     namespace 'com.fabricio.gbaoffline'
     compileSdk 35
     defaultConfig {
-        applicationId 'com.fabricio.firegame.ds'
+        applicationId 'com.fabricio.firegame'
         minSdk 24
         targetSdk 35
-        versionCode 12
-        versionName '3.0'
+        versionCode (project.findProperty('fireVersionCode') ?: '14').toInteger()
+        versionName '3.1'
         testInstrumentationRunner 'com.fabricio.gbaoffline.OfflineSmokeRunner'
+    }
+    buildTypes {
+        debug { applicationIdSuffix '.testbuild' }
+        release { minifyEnabled false }
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17

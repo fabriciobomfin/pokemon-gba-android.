@@ -131,6 +131,19 @@ public class OfflineSmokeRunner extends Instrumentation {
             activity = (MainActivity)startActivitySync(launch);
             final MainActivity app = activity;
             waitJs(app, "typeof Android!=='undefined' && !!document.getElementById('import')");
+            if(phase.startsWith("upgrade-")){
+                if("upgrade-seed".equals(phase)){
+                    js(app,"localStorage.setItem('upgrade-marker','keep-me')");
+                    getTargetContext().getSharedPreferences("upgrade-test",0).edit()
+                        .putInt("version",getTargetContext().getPackageManager().getPackageInfo(getTargetContext().getPackageName(),0).versionCode).commit();
+                }else{
+                    int previous=getTargetContext().getSharedPreferences("upgrade-test",0).getInt("version",-1);
+                    require(previous>0 && getTargetContext().getPackageManager().getPackageInfo(getTargetContext().getPackageName(),0).versionCode>previous,"Version did not increase");
+                    require("true".equals(js(app,"localStorage.getItem('upgrade-marker')==='keep-me' && Object.keys(JSON.parse(Android.library())).length===2")),"Preferences or ROM library lost during update");
+                    phase="ds-reopen";testDs(app);
+                }
+                Bundle result=new Bundle();result.putString("stream","\nOK (1 test)\n");finish(Activity.RESULT_OK,result);return;
+            }
             if(phase.startsWith("ds")){
                 testDs(app);
                 status.putString("stream","DS offline dual-screen, touch, cartridge and checkpoint tests passed.");
