@@ -93,7 +93,7 @@ public class OfflineSmokeRunner extends Instrumentation {
         android.view.MotionEvent event=android.view.MotionEvent.obtain(now,now,0,x,y,0);event.setSource(android.view.InputDevice.SOURCE_TOUCHSCREEN);getUiAutomation().injectInputEvent(event,true);event.recycle();
         Thread.sleep(800);android.util.Log.i("FireGameDSTouch",js(app,"JSON.stringify({touch:window.dsLastTouch,errors:window.runtimeErrors})"));expectDsColors(0,1);
         event=android.view.MotionEvent.obtain(now,android.os.SystemClock.uptimeMillis(),1,x,y,0);event.setSource(android.view.InputDevice.SOURCE_TOUCHSCREEN);getUiAutomation().injectInputEvent(event,true);event.recycle();
-        Thread.sleep(500);expectDsColors(0,2);
+        Thread.sleep(500);android.util.Log.i("FireGameDSRelease",js(app,"JSON.stringify({touch:window.dsLastTouch,pointer:dsPointer,paused:EJS_emulator.paused,frame:EJS_emulator.gameManager.getFrameNum(),errors:window.runtimeErrors})"));expectDsColors(0,2);
     }
     private void testDsDisplay(MainActivity app) throws Exception {
         waitJs(app,"dsLayout==='top only' && settings.screen==='full'");Thread.sleep(700);
