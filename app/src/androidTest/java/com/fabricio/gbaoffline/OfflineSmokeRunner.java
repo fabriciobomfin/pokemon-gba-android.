@@ -237,7 +237,13 @@ public class OfflineSmokeRunner extends Instrumentation {
             waitJs(app, "location.pathname.endsWith('/play.html') && !!window.EJS_emulator");
             waitJs(app, "!!(window.EJS_emulator && EJS_emulator.started && EJS_emulator.gameManager && EJS_emulator.gameManager.getFrameNum()>120)");
             require("true".equals(js(app,"settings.theme==='ciano' && document.querySelector('canvas').width>=240")),"GBA canvas missing");
-            android.graphics.Bitmap screenshot = getUiAutomation().takeScreenshot();
+            android.graphics.Bitmap screenshot = null;
+            for(int attempt=0;attempt<40;attempt++){
+                if(screenshot!=null)screenshot.recycle();
+                screenshot=getUiAutomation().takeScreenshot();
+                if(screenshot!=null && colorCount(screenshot,0)>1000)break;
+                Thread.sleep(250);
+            }
             require(screenshot != null, "Android screenshot unavailable");
             try(FileOutputStream image=new FileOutputStream(new File(getTargetContext().getCacheDir(),"smoke.png"))) {
                 screenshot.compress(android.graphics.Bitmap.CompressFormat.PNG,100,image);
