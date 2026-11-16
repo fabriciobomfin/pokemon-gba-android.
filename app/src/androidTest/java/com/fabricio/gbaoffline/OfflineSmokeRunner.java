@@ -57,9 +57,15 @@ public class OfflineSmokeRunner extends Instrumentation {
         return count;
     }
     private void expectDsColors(int first,int second) throws Exception {
-        android.graphics.Bitmap bitmap=getUiAutomation().takeScreenshot();
-        try{require(colorCount(bitmap,first)>600 && colorCount(bitmap,second)>600,"DS screen colors missing: "+colorCount(bitmap,first)+","+colorCount(bitmap,second));}
-        finally{bitmap.recycle();}
+        int countFirst=0,countSecond=0;
+        for(int attempt=0;attempt<30;attempt++){
+            android.graphics.Bitmap bitmap=getUiAutomation().takeScreenshot();
+            try{countFirst=colorCount(bitmap,first);countSecond=colorCount(bitmap,second);}finally{bitmap.recycle();}
+            if(countFirst>600 && countSecond>600)return;
+            Thread.sleep(200);
+        }
+        capture("ds-touch-failure.png");
+        throw new AssertionError("DS screen colors missing: "+countFirst+","+countSecond);
     }
     private void touchDs(MainActivity app, boolean portrait) throws Exception {
         String result=js(app,"JSON.stringify({x:(el('game').getBoundingClientRect().left+el('game').clientWidth*"+(portrait?".5":".75")+")*devicePixelRatio,y:(el('game').getBoundingClientRect().top+el('game').clientHeight*"+(portrait?".75":".5")+")*devicePixelRatio})");

@@ -28,7 +28,7 @@ if [ "$test_result" -eq 0 ]; then
     if ! grep -Fq 'OK (1 test)' "app/build/reports/device/$phase.txt"; then test_result=1; break; fi
   done
 fi
-for image in ds-wide ds-portrait ds-reopen ds-single ds-overlay-wide ds-overlay-portrait; do
+for image in ds-wide ds-portrait ds-reopen ds-single ds-overlay-wide ds-overlay-portrait ds-touch-failure; do
   adb exec-out run-as com.fabricio.firegame.stable.testbuild cat "cache/$image.png" > "app/build/reports/device/$image.png" || true
 done
 adb logcat -d > app/build/reports/device/logcat.txt || true

@@ -22,9 +22,9 @@ function initDSDisplay(){
  dsPreview.addEventListener('touchstart',e=>{e.preventDefault();e.stopPropagation();if(settings.dsActive==='bottom'||dsPointer!==null)return;const t=e.changedTouches[0];if(t){dsPointer=t.identifier;forwardDSTouch(t,'touchstart')}},{passive:false});
  dsPreview.addEventListener('touchmove',e=>{e.preventDefault();e.stopPropagation();const t=Array.from(e.changedTouches).find(t=>t.identifier===dsPointer);if(t)forwardDSTouch(t,'touchmove')},{passive:false});
  for(const kind of ['touchend','touchcancel'])dsPreview.addEventListener(kind,e=>{e.preventDefault();e.stopPropagation();const t=Array.from(e.changedTouches).find(t=>t.identifier===dsPointer);if(t){forwardDSTouch(t,'touchend');dsPointer=null;}},{passive:false});
- dsPreview.addEventListener('mousedown',e=>{if(settings.dsActive==='bottom'||dsPointer!==null)return;e.preventDefault();dsPointer='mouse';forwardDSTouch(e,'touchstart')});
- window.addEventListener('mousemove',e=>{if(dsPointer==='mouse')forwardDSTouch(e,'touchmove')});
- window.addEventListener('mouseup',e=>{if(dsPointer==='mouse'){forwardDSTouch(e,'touchend');dsPointer=null;}});
+ dsPreview.addEventListener('pointerdown',e=>{if(e.pointerType!=='mouse')return;if(settings.dsActive==='bottom'||dsPointer!==null)return;e.preventDefault();dsPointer='mouse';forwardDSTouch(e,'touchstart')});
+ window.addEventListener('pointermove',e=>{if(e.pointerType==='mouse'&&dsPointer==='mouse')forwardDSTouch(e,'touchmove')});
+ window.addEventListener('pointerup',e=>{if(e.pointerType==='mouse'&&dsPointer==='mouse'){forwardDSTouch(e,'touchend');dsPointer=null;}});
  window.addEventListener('blur',releaseDSTouch);
  document.addEventListener('visibilitychange',()=>{if(document.hidden)releaseDSTouch()});
 }
