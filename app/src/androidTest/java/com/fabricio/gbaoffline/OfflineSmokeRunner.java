@@ -164,11 +164,11 @@ public class OfflineSmokeRunner extends Instrumentation {
             Intent launch = new Intent(getTargetContext(), MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             activity = (MainActivity)startActivitySync(launch);
             final MainActivity app = activity;
-            waitJs(app, "typeof Android!=='undefined' && !!document.getElementById('import') && innerHeight>innerWidth");
+            waitJs(app, "typeof Android!=='undefined' && !!document.getElementById('import') && innerHeight>innerWidth && typeof read==='function' && typeof el==='function'");
             if(phase.startsWith("upgrade-")){
                 if("upgrade-seed".equals(phase)){
                     String preserved=js(app,"JSON.stringify({library:JSON.parse(Android.library()),theme:read('fire-game-theme',null),profiles:Object.keys(localStorage).filter(k=>k.startsWith('pocket:')).sort().map(k=>[k,localStorage.getItem(k)])})");
-                    require("true".equals(js(app,"Object.keys(JSON.parse(Android.library())).length===2 && read('fire-game-theme',null)==='dourado'")),"Expected pre-update library and theme missing");
+                    waitJs(app,"Object.keys(JSON.parse(Android.library())).length===2 && read('fire-game-theme',null)==='dourado'");
                     getTargetContext().getSharedPreferences("upgrade-test",0).edit()
                         .putString("preserved",preserved).putInt("version",getTargetContext().getPackageManager().getPackageInfo(getTargetContext().getPackageName(),0).versionCode).commit();
                 }else{
