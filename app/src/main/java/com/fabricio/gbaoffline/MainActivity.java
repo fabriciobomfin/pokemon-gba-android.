@@ -31,6 +31,7 @@ public class MainActivity extends Activity {
     private static final String PLAY = "https://" + HOST + "/assets/play.html";
     private final ExecutorService imports = Executors.newSingleThreadExecutor();
     WebView web;
+    private android.webkit.ValueCallback<Uri[]> coverCallback;
     private boolean importing;
     private boolean backgrounded;
     private int pauseGeneration;
@@ -51,10 +52,21 @@ public class MainActivity extends Activity {
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
         settings.setAllowFileAccess(false);
-        settings.setAllowContentAccess(false);
+        settings.setAllowContentAccess(true);
         settings.setMediaPlaybackRequiresUserGesture(false);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
-        web.setWebChromeClient(new WebChromeClient());
+        web.setWebChromeClient(new WebChromeClient() {
+            @Override public boolean onShowFileChooser(WebView view, android.webkit.ValueCallback<Uri[]> callback, FileChooserParams params) {
+                if (coverCallback != null) coverCallback.onReceiveValue(null);
+                coverCallback = callback;
+                Intent pick = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                pick.addCategory(Intent.CATEGORY_OPENABLE);
+                pick.setType("image/*");
+                try { startActivityForResult(pick, 15); }
+                catch (android.content.ActivityNotFoundException e) { coverCallback.onReceiveValue(null); coverCallback = null; }
+                return true;
+            }
+        });
         web.setWebViewClient(new WebViewClient() {
             @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 Uri uri = request.getUrl();
@@ -257,6 +269,13 @@ public class MainActivity extends Activity {
     }
     @Override protected void onActivityResult(int request, int result, Intent data) {
         super.onActivityResult(request, result, data);
+        if (request == 15) {
+            if (coverCallback != null) {
+                coverCallback.onReceiveValue(result == RESULT_OK && data != null && data.getData() != null ? new Uri[]{data.getData()} : null);
+                coverCallback = null;
+            }
+            return;
+        }
         if ((request == 13 || request == 14) && result == RESULT_OK && data != null && data.getData() != null) {
             Uri uri = data.getData();
             imports.execute(() -> {
