@@ -2,7 +2,8 @@ const deck=el('console'),panel=el('settings-panel'),profileKey='pocket:'+rom.id;
 deck.setAttribute('aria-label',isDS?'Controle Nintendo DS':'Controle GBA');
 const defaults={skin:'round',accent:'tema',focus:true,theme:'ameixa',orientation:'horizontal',preset:'classic',volume:75,filter:'original',brightness:100,saturation:100,fit:'contain',speed:'1',interval:1,positions:{},sizes:{},screen:'console',haptic:true};
 let settings=Object.assign({},defaults,read(profileKey,{})),editing=false,activeSeconds=0;
-settings.orientation='horizontal';
+// Restore this ROM's orientation instead of overwriting its profile.
+if(['cover','fill'].includes(settings.fit))settings.fit='contain';
 if(settings.batterySaveVersion!==1){settings.interval=1;settings.batterySaveVersion=1;}
 settings.positions=settings.positions||{};settings.sizes=settings.sizes||{};
 settings.theme=read('fire-game-theme',settings.theme);delete settings.accent;
@@ -137,7 +138,7 @@ setting('theme','Tema completo',Object.entries(themes).map(([id,theme])=>[id,the
 setting('orientation','Orientação',choices('auto|Automática','vertical|Em pé','horizontal|Deitado'));
 setting('screen','Área do jogo',choices('console|Console · espaço para controles','full|Tela inteira · controles sobre o jogo'));
 if(isDS){setting('dsMode','Telas do Nintendo DS',choices('single|Uma tela ampliada','overlay|Segunda tela em janela','dual|Duas telas lado a lado / empilhadas'));setting('dsWindowSize','Tamanho da janela DS',[18,45,1],'range');}
-setting('fit','Enquadramento',isDS?choices('contain|Proporção original'):choices('contain|Proporção original','cover|Preencher com corte','fill|Esticar'));
+setting('fit','Enquadramento',isDS?choices('contain|Proporção original'):choices('contain|Original · imagem completa','immersive|Tela ampla · sem deformação'));
 setting('filter','Imagem',choices('original|Original','lcd|LCD','crt|CRT','mono|Monocromática','warm|Quente'));
 setting('brightness','Brilho da imagem',[50,150,5],'range');setting('saturation','Intensidade das cores',[0,170,5],'range');
 setting('volume','Volume',[0,100,5],'range');
@@ -274,9 +275,9 @@ function updateCanvasCrop(){
  if(observedCanvas!==canvas){observedCanvas=canvas;new MutationObserver(updateCanvasCrop).observe(canvas,{attributes:true,attributeFilter:['width','height']});}
 }
 function apply(){
- applyTheme(settings.theme);write('fire-game-theme',settings.theme);document.body.dataset.screen=settings.screen;
+ applyTheme(settings.theme);write('fire-game-theme',settings.theme);document.body.dataset.screen=settings.fit==='immersive'?'full':settings.screen;
  for(const key of ['focus','contrast','bigtext'])document.body.classList.toggle(key,!!settings[key]);document.body.classList.toggle('scan',['lcd','crt'].includes(settings.filter));
- const canvas=emulator()?.canvas;if(canvas){canvas.style.setProperty('object-fit',settings.fit==='contain'?'contain':'fill','important');canvas.style.setProperty('image-rendering',el('sharp-image').checked?'pixelated':'auto','important');canvas.style.filter='brightness('+settings.brightness+'%) saturate('+settings.saturation+'%) '+({mono:'grayscale(1)',warm:'sepia(.35)',lcd:'contrast(.9)',crt:'contrast(1.18)'}[settings.filter]||'')}
+ const canvas=emulator()?.canvas;if(canvas){canvas.style.setProperty('object-fit','contain','important');canvas.style.setProperty('image-rendering',el('sharp-image').checked?'pixelated':'auto','important');canvas.style.filter='brightness('+settings.brightness+'%) saturate('+settings.saturation+'%) '+({mono:'grayscale(1)',warm:'sepia(.35)',lcd:'contrast(.9)',crt:'contrast(1.18)'}[settings.filter]||'')}
  Android.orientation(settings.orientation==='vertical'?1:settings.orientation==='horizontal'?2:0);Android.immersive(!!settings.focus);
  const e=emulator();
  applyDSDisplay();
