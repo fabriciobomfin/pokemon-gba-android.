@@ -338,7 +338,17 @@ public class OfflineSmokeRunner extends Instrumentation {
                 }
             };
             addMonitor(coverMonitor);
-            js(app,"edit(info.id);document.querySelector('#detail input[type=file]').click()");
+            js(app,"edit(info.id);document.querySelector('#detail input[type=file]').scrollIntoView({block:'center'})");
+            Thread.sleep(500);
+            double cssWidth=Double.parseDouble(js(app,"innerWidth"));
+            double inputX=Double.parseDouble(js(app,"(()=>{const r=document.querySelector('#detail input[type=file]').getBoundingClientRect();return r.left+r.width/2})()"));
+            double inputY=Double.parseDouble(js(app,"(()=>{const r=document.querySelector('#detail input[type=file]').getBoundingClientRect();return r.top+r.height/2})()"));
+            int[] webLocation=new int[2];runOnMainSync(()->app.web.getLocationOnScreen(webLocation));
+            float tapX=(float)(webLocation[0]+inputX*app.web.getWidth()/cssWidth),tapY=(float)(webLocation[1]+inputY*app.web.getWidth()/cssWidth);
+            long tapTime=android.os.SystemClock.uptimeMillis();
+            android.view.MotionEvent down=android.view.MotionEvent.obtain(tapTime,tapTime,android.view.MotionEvent.ACTION_DOWN,tapX,tapY,0);
+            android.view.MotionEvent up=android.view.MotionEvent.obtain(tapTime,tapTime+80,android.view.MotionEvent.ACTION_UP,tapX,tapY,0);
+            getUiAutomation().injectInputEvent(down,true);getUiAutomation().injectInputEvent(up,true);down.recycle();up.recycle();
             for(int i=0;i<50&&!chooserOpened.get();i++)Thread.sleep(100);
             require(chooserOpened.get(),"Cover chooser did not open");
             Thread.sleep(1500);
