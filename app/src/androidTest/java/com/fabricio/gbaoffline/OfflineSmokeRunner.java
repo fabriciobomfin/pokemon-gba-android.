@@ -387,6 +387,25 @@ public class OfflineSmokeRunner extends Instrumentation {
             waitJs(app,"!el('load-point').disabled");
             js(app,"el('reopen').click();el('load-point').click()");
             waitJs(app,"el('checkpoint-status').textContent==='Save restaurado.' && el('settings-panel').hidden");
+            // Destructive actions must be cancellable, scoped, and leave cartridge saves intact.
+            js(app,"window.bulkSeed=false;saveQuery('readwrite',s=>s.put({game:'other-rom-test',time:123,bytes:new Uint8Array([1])})).then(()=>window.bulkSeed=true);window.batteryBefore=Android.loadFiles();window.profileBefore=localStorage.getItem(profileKey);historyView()");
+            waitJs(app,"window.bulkSeed && !!el('erase-all-saves')");
+            js(app,"el('erase-all-saves').click();el('cancel-erase-saves').click();window.cancelPreserved=false;checkpoint().then(p=>window.cancelPreserved=!!p)");
+            waitJs(app,"window.cancelPreserved && !!el('erase-all-saves')");
+            js(app,"el('erase-all-saves').click();el('confirm-erase-saves').click()");
+            waitJs(app,"!checkpointBusy && !hasCheckpoint && !!el('erase-all-saves')");
+            js(app,"window.otherPreserved=false;saveQuery('readonly',s=>s.get(['other-rom-test',123])).then(p=>window.otherPreserved=!!p)");
+            waitJs(app,"window.otherPreserved");
+            require("true".equals(js(app,"Android.loadFiles()===window.batteryBefore && localStorage.getItem(profileKey)===window.profileBefore && el('load-point').disabled")),"Bulk erase damaged cartridge or profile");
+            js(app,"el('erase-all-saves').click();el('erase-scope').value='all';el('confirm-erase-saves').click()");
+            waitJs(app,"!checkpointBusy && !!el('erase-all-saves')");
+            js(app,"window.noPoints=false;saveQuery('readonly',s=>s.count()).then(n=>window.noPoints=n===0)");
+            waitJs(app,"window.noPoints");
+            require("true".equals(js(app,"Android.loadFiles()===window.batteryBefore")),"All-game erase damaged cartridge save");
+            capture("save-manager.png");
+            js(app,"historyBox.close();leaveGame()");
+            waitJs(app,"!!el('library-count')");
+            capture("library-redesign.png");
             status.putString("stream","\nOffline ROM import, >120 emulated frames, reopen, invalid import rollback and persistent saves passed.\n");
             sendStatus(0,status);
             Bundle result=new Bundle();result.putString("stream","\nOK (1 test)\n"); finish(Activity.RESULT_OK,result);

@@ -57,7 +57,33 @@ async function historyView(){
   historyBox.append(row);
  }
  if(!keys.length)historyBox.append(make('p','Nenhum save para este jogo.'));
- historyBox.append(action('Fechar',()=>historyBox.close()));if(!historyBox.open)historyBox.showModal();
+ const erase=action('Apagar todos os saves',confirmEraseSaves);erase.id='erase-all-saves';erase.className='danger-button';historyBox.append(erase,action('Fechar',()=>historyBox.close()));if(!historyBox.open)historyBox.showModal();
+}
+function confirmEraseSaves(){
+ if(checkpointBusy)return;
+ historyBox.replaceChildren(make('h2','Apagar todos os saves?'));
+ const description=make('p','Apaga os pontos criados pelo botão Salvar do emulador. O progresso salvo dentro do jogo, suas ROMs e capas serão mantidos.');
+ description.className='delete-description';
+ const scope=make('select');scope.id='erase-scope';scope.setAttribute('aria-label','Quais saves apagar');
+ for(const [value,label] of [['game','Somente deste jogo'],['all','De todos os jogos']]){const option=make('option',label);option.value=value;scope.append(option)}
+ const warning=make('p','Esta ação não pode ser desfeita. Exporte um backup antes se quiser guardar esses pontos.');
+ warning.className='delete-warning';
+ const cancel=action('Cancelar',historyView);cancel.id='cancel-erase-saves';
+ const confirm=action('Apagar definitivamente',async()=>{
+  if(checkpointBusy)return;checkpointBusy=true;refreshCheckpoint();confirm.disabled=cancel.disabled=scope.disabled=true;
+  try{
+   const db=await checkpoints;const stores=['history'];if(db.objectStoreNames.contains('games'))stores.push('games');
+   await new Promise((resolve,reject)=>{
+    const tx=db.transaction(stores,'readwrite');tx.oncomplete=resolve;tx.onabort=()=>reject(tx.error);
+    if(scope.value==='all'){for(const name of stores)tx.objectStore(name).clear()}
+    else{tx.objectStore('history').delete(saveRange);if(stores.includes('games'))tx.objectStore('games').delete(rom.id)}
+   });
+   hasCheckpoint=!!await checkpoint();feedback.textContent='Saves apagados. Progresso do cartucho preservado.';
+   await historyView();
+  }catch{warning.textContent='Não foi possível apagar os saves. Tente novamente.';confirm.disabled=cancel.disabled=scope.disabled=false}
+  finally{checkpointBusy=false;refreshCheckpoint()}
+ });confirm.id='confirm-erase-saves';confirm.className='danger-button';
+ historyBox.append(description,scope,warning,cancel,confirm);cancel.focus();
 }
 const saveButton=action('Salvar jogo',()=>useCheckpoint(true));
 const loadButton=action('Voltar ao save',()=>useCheckpoint(false));
