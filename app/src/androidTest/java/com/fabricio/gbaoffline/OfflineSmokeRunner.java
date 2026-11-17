@@ -280,6 +280,8 @@ public class OfflineSmokeRunner extends Instrumentation {
             require("true".equals(js(app,"Math.abs(buttons.A.getBoundingClientRect().width/originalA-1.6)<.05 && Math.abs(buttons.B.getBoundingClientRect().width-originalB)<1 && read(profileKey,{}).sizes.A===160")),"Individual button size or persistence failed");
             js(app,"startEditing();selectControl('reopen');resizeInput.value=130;resizeInput.dispatchEvent(new Event('input'));finishEditing();settings.theme='dourado';apply();persist()");
             require("true".equals(js(app,"document.documentElement.dataset.theme==='dourado' && read('fire-game-theme','')==='dourado' && getComputedStyle(buttons.A).backgroundColor===getComputedStyle(el('save-point')).backgroundColor && scaleFor('reopen')===1.3")),"Unified theme or shortcut scaling failed");
+            require("true".equals(js(app,"el('control-opacity').value=35;el('control-opacity').dispatchEvent(new Event('input'));settings.contrast=true;apply();Math.abs(parseFloat(getComputedStyle(buttons.A).opacity)-.35)<.01 && Math.abs(parseFloat(getComputedStyle(el('reopen')).opacity)-.35)<.01")),"Control opacity ignored");
+            js(app,"settings.contrast=false;apply()");
             js(app,"settings.screen='console';settings.fit='immersive';settings.orientation='horizontal';apply();persist()");
             waitJs(app,"innerWidth>innerHeight && Math.abs(el('game').getBoundingClientRect().width-innerWidth)<2 && Math.abs(el('game').getBoundingClientRect().height-innerHeight)<2");
             Thread.sleep(1200);js(app,"window.layoutFrame=EJS_emulator.gameManager.getFrameNum()");
@@ -316,6 +318,35 @@ public class OfflineSmokeRunner extends Instrumentation {
             waitJs(app,"!!document.getElementById('continue') && !document.getElementById('saved').hidden");
             require("true".equals(js(app,"el('game-count').textContent==='1 jogo' && !el('recent').hidden && el('recent-games').children.length===1 && document.querySelector('[data-id=dourado]').getAttribute('aria-pressed')==='true'")),"Library or theme after returning failed");
             require("true".equals(js(app,"el('search').value='impossivel';render();!el('list').querySelector('article') && (el('gba-category').click(),el('list').querySelectorAll('article').length===1)")),"Search or category reset failed");
+            // Exercise Android's file chooser callback and WebView image decoding.
+            android.content.ContentValues imageValues = new android.content.ContentValues();
+            imageValues.put(android.provider.MediaStore.Images.Media.DISPLAY_NAME,"firegame-cover-test.png");
+            imageValues.put(android.provider.MediaStore.Images.Media.MIME_TYPE,"image/png");
+            Uri coverUri = getTargetContext().getContentResolver().insert(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI,imageValues);
+            require(coverUri != null,"Cannot create cover test image");
+            android.graphics.Bitmap coverBitmap=android.graphics.Bitmap.createBitmap(48,64,android.graphics.Bitmap.Config.ARGB_8888);
+            coverBitmap.eraseColor(android.graphics.Color.CYAN);
+            try(java.io.OutputStream out=getTargetContext().getContentResolver().openOutputStream(coverUri)){coverBitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,out);}
+            coverBitmap.recycle();
+            java.util.concurrent.atomic.AtomicBoolean chooserOpened=new java.util.concurrent.atomic.AtomicBoolean();
+            ActivityMonitor coverMonitor=new ActivityMonitor(){
+                @Override public ActivityResult onStartActivity(Intent intent){
+                    if(Intent.ACTION_OPEN_DOCUMENT.equals(intent.getAction()) && "image/*".equals(intent.getType())){
+                        chooserOpened.set(true);return new ActivityResult(Activity.RESULT_OK,new Intent().setData(coverUri));
+                    }
+                    return null;
+                }
+            };
+            addMonitor(coverMonitor);
+            js(app,"edit(info.id);document.querySelector('#detail input[type=file]').click()");
+            for(int i=0;i<50&&!chooserOpened.get();i++)Thread.sleep(100);
+            require(chooserOpened.get(),"Cover chooser did not open");
+            Thread.sleep(1500);
+            js(app,"Array.from(detail.querySelectorAll('button')).find(b=>b.textContent==='Salvar').click()");
+            waitJs(app,"!!gameMeta(info.id).cover && !!el('list').querySelector('.game-cover img')");
+            capture("library-covers.png");
+            removeMonitor(coverMonitor);
+            getTargetContext().getContentResolver().delete(coverUri,null,null);
             // Export via the production document callback, erase the local records, then import.
             js(app,"el('exp').click()");
             Thread.sleep(1500);
