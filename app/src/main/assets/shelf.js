@@ -41,9 +41,49 @@ function show(title){detail.replaceChildren(make('h2',title));if(!dialog.open)di
 function edit(id){
  const meta=gameMeta(id);show('Detalhes do jogo');
  const name=make('input');name.value=meta.name||games[id];name.maxLength=100;name.setAttribute('aria-label','Nome na biblioteca');
- const cover=make('input');cover.type='file';cover.accept='image/*';cover.setAttribute('aria-label','Escolher capa');let artwork=meta.cover||'';cover.onchange=()=>{const file=cover.files[0];if(!file)return;const img=new Image();const url=URL.createObjectURL(file);img.onload=()=>{const c=document.createElement('canvas');c.width=240;c.height=320;const ctx=c.getContext('2d');const scale=Math.max(240/img.width,320/img.height);ctx.drawImage(img,(240-img.width*scale)/2,(320-img.height*scale)/2,img.width*scale,img.height*scale);artwork=c.toDataURL('image/jpeg',.8);URL.revokeObjectURL(url)};img.src=url};
+ const cover=make('input');cover.type='file';cover.accept='image/*';cover.setAttribute('aria-label','Escolher capa');
+ const crop=make('section');crop.className='cover-editor';crop.hidden=true;
+ const preview=make('canvas');preview.id='cover-preview';preview.width=240;preview.height=320;preview.setAttribute('aria-label','Prévia da capa na biblioteca');
+ const zoom=make('input'),horizontal=make('input'),vertical=make('input');
+ for(const [control,id,label,min,max,value] of [[zoom,'cover-zoom','Zoom',100,300,100],[horizontal,'cover-x','Posição horizontal',0,100,50],[vertical,'cover-y','Posição vertical',0,100,50]]){control.id=id;control.type='range';control.min=min;control.max=max;control.value=value;control.step=1;control.setAttribute('aria-label',label)}
+ const zoomLabel=make('label','Zoom');zoomLabel.htmlFor=zoom.id;const zoomValue=make('output','100%');zoomValue.id='cover-zoom-value';zoomLabel.append(zoomValue);
+ const xLabel=make('label','Posição horizontal');xLabel.htmlFor=horizontal.id;const yLabel=make('label','Posição vertical');yLabel.htmlFor=vertical.id;
+ const caption=make('p','Arraste a imagem ou use os ajustes. A prévia mostra exatamente o recorte que será salvo.');
+ const status=make('small');status.id='cover-status';status.setAttribute('role','status');
+ let artwork=meta.cover||'',source=null,serial=0,drag=null;
+ function drawCover(){
+  if(!source)return;
+  const scale=Math.max(240/source.naturalWidth,320/source.naturalHeight)*Number(zoom.value)/100;
+  const width=source.naturalWidth*scale,height=source.naturalHeight*scale;
+  const ctx=preview.getContext('2d');ctx.clearRect(0,0,240,320);ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
+  ctx.drawImage(source,(240-width)*Number(horizontal.value)/100,(320-height)*Number(vertical.value)/100,width,height);
+  artwork=preview.toDataURL('image/jpeg',.9);zoomValue.textContent=zoom.value+'%';
+ }
+ for(const control of [zoom,horizontal,vertical])control.oninput=drawCover;
+ const center=action('Centralizar',()=>{horizontal.value=vertical.value=50;drawCover()});center.id='cover-center';
+ preview.onpointerdown=e=>{if(!source)return;e.preventDefault();drag=[e.clientX,e.clientY];preview.setPointerCapture(e.pointerId)};
+ preview.onpointermove=e=>{if(!drag||!preview.hasPointerCapture(e.pointerId))return;const r=preview.getBoundingClientRect();const scale=Math.max(240/source.naturalWidth,320/source.naturalHeight)*Number(zoom.value)/100;
+  const excessX=source.naturalWidth*scale-240,excessY=source.naturalHeight*scale-320;
+  if(excessX>0)horizontal.value=Math.max(0,Math.min(100,Number(horizontal.value)-(e.clientX-drag[0])*240/r.width/excessX*100));
+  if(excessY>0)vertical.value=Math.max(0,Math.min(100,Number(vertical.value)-(e.clientY-drag[1])*320/r.height/excessY*100));
+  drag=[e.clientX,e.clientY];drawCover();
+ };
+ preview.onlostpointercapture=()=>drag=null;
+ crop.append(preview,caption,zoomLabel,zoom,xLabel,horizontal,yLabel,vertical,center);
  const notes=make('textarea');notes.placeholder='Anotações da aventura';notes.value=meta.notes||'';notes.maxLength=5000;
- detail.append(name,make('p','Capa personalizada (salva offline)'),cover,notes,make('p','Sessões iniciadas: '+(meta.sessions||0)),make('p','Tempo jogado: '+Math.floor((meta.seconds||0)/60)+' min'),make('small','ID da ROM · '+id.slice(0,12)),action('Salvar',()=>{updateMeta(id,{name:name.value.trim()||games[id],notes:notes.value,cover:artwork});dialog.close();render()}))
+ const save=action('Salvar',()=>{try{updateMeta(id,{name:name.value.trim()||games[id],notes:notes.value,cover:artwork});dialog.close();render()}catch{status.textContent='Sem espaço para salvar a capa. Tente uma imagem menor.'}});save.id='save-game-details';
+ cover.onchange=()=>{
+  const file=cover.files[0];if(!file)return;const ticket=++serial;
+  if(file.size>20*1024*1024){save.disabled=false;status.textContent='Escolha uma imagem de até 20 MB.';return}
+  save.disabled=true;status.textContent='Carregando imagem…';const image=new Image(),url=URL.createObjectURL(file);
+  image.onload=()=>{URL.revokeObjectURL(url);if(ticket!==serial)return;save.disabled=false;
+   if(!image.naturalWidth||image.naturalWidth*image.naturalHeight>40000000){status.textContent='Imagem grande demais. Escolha uma com até 40 megapixels.';return}
+   source=image;zoom.value=100;horizontal.value=vertical.value=50;crop.hidden=false;drawCover();status.textContent='Ajuste o recorte e toque em Salvar.';
+  };
+  image.onerror=()=>{URL.revokeObjectURL(url);if(ticket!==serial)return;save.disabled=false;status.textContent='Não foi possível abrir esta imagem.'};image.src=url;
+ };
+ if(artwork){const current=new Image();current.onload=()=>{if(source||serial)return;source=current;crop.hidden=false;drawCover()};current.src=artwork}
+ detail.append(name,make('p','Capa personalizada · disponível offline'),cover,status,crop,notes,make('p','Sessões iniciadas: '+(meta.sessions||0)),make('p','Tempo jogado: '+Math.floor((meta.seconds||0)/60)+' min'),save);
 }
 function render(){
  const ids=Object.keys(games),q=el('search').value.toLocaleLowerCase(),order=el('sort').value;
@@ -101,3 +141,4 @@ for(const [id,theme] of Object.entries(themes)){
  el('gallery').append(tile);
 }
 openPage('home');
+

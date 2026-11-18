@@ -28,7 +28,7 @@ if [ "$test_result" -eq 0 ]; then
     if ! grep -Fq 'OK (1 test)' "app/build/reports/device/$phase.txt"; then test_result=1; break; fi
   done
 fi
-for image in library-covers library-redesign save-manager ds-wide ds-portrait ds-reopen ds-single ds-overlay-wide ds-overlay-portrait ds-touch-failure; do
+for image in cover-crop game-indicators full-backup library-covers library-redesign save-manager ds-wide ds-portrait ds-reopen ds-single ds-overlay-wide ds-overlay-portrait ds-touch-failure; do
   adb exec-out run-as com.fabricio.firegame.stable.testbuild cat "cache/$image.png" > "app/build/reports/device/$image.png" || true
 done
 adb logcat -d > app/build/reports/device/logcat.txt || true
@@ -43,3 +43,4 @@ if [ "$test_result" -eq 0 ]; then
   grep -Fq 'OK (1 test)' app/build/reports/device/upgrade-check.txt || exit 1
 fi
 exit "$test_result"
+

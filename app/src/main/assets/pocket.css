@@ -189,3 +189,16 @@ button.danger-button{color:#fda4af!important;border:1px solid #fb718555!importan
 #detail input:not([type=file]),#detail textarea{display:block;width:100%;margin:10px 0}#detail input[type=file]{max-width:100%;font-size:12px}#detail p{font-size:13px;color:var(--muted)}
 @media(min-width:650px){#list{grid-template-columns:repeat(3,minmax(0,1fr))}.home-intro h2{font-size:44px}#hero-cover{width:112px}#saved h2{font-size:28px}}
 @media(min-width:900px){#list{grid-template-columns:repeat(4,minmax(0,1fr))}}
+
+
+#game-hud{position:fixed;z-index:23;bottom:max(6px,env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);display:flex;gap:10px;align-items:center;padding:4px 9px;background:#080c16a8;color:#f1f5f9;border:1px solid #ffffff20;border-radius:20px;font:500 10px/1.4 system-ui;letter-spacing:.2px;pointer-events:none;white-space:nowrap;font-variant-numeric:tabular-nums}
+#game-hud .low-battery{color:#fda4af}#game-hud span+span{border-left:1px solid #ffffff25;padding-left:9px}
+.cover-editor{margin:16px 0;padding:16px;border:1px solid var(--line);border-radius:18px;background:var(--base)}
+#cover-preview{display:block;width:min(100%,180px);height:auto;aspect-ratio:3/4;margin:auto;border-radius:12px;touch-action:none;cursor:grab;box-shadow:0 10px 24px #0004}
+.cover-editor label{display:flex;justify-content:space-between;font-size:12px;margin-top:12px}.cover-editor input[type=range]{display:block;width:100%!important;margin:12px 0!important;padding:0!important}
+#cover-status{display:block;padding:8px 0;font-size:12px}#save-game-details{display:block;width:100%;background:var(--accent);color:var(--on-accent);margin-top:16px}
+#full-export,#full-import{display:block;width:100%;margin:12px 0}#full-backup-status{font-size:12px;color:var(--accent)}
+.backup-working .shelf>header,.backup-working #home-nav,.backup-working #home-page{pointer-events:none;opacity:.6}
+.backup-working #modal button{pointer-events:none;opacity:.55}
+#waiting-games{border:1px solid var(--line);background:var(--panel);border-radius:16px;padding:16px;margin-top:16px;font-size:12px}
+#waiting-games small{display:block;margin-top:6px;color:var(--accent)}

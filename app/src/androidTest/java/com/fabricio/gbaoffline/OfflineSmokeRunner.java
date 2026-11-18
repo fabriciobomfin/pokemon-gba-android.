@@ -48,6 +48,54 @@ public class OfflineSmokeRunner extends Instrumentation {
     }
     private void require(boolean valid, String message) { if (!valid) throw new AssertionError(message); }
 
+
+    private void fullBackupTests(MainActivity app) throws Exception {
+        String missing="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        File absentSave=new File(getTargetContext().getFilesDir(),"saves/"+missing+"/mGBA/"+missing+".srm");
+        require(absentSave.getParentFile().mkdirs()||absentSave.getParentFile().isDirectory(),"Missing save directory");
+        try(FileOutputStream out=new FileOutputStream(absentSave)){out.write(new byte[]{42,43,44});}
+        js(app,"window.absentId='"+missing+"';write('meta:'+absentId,{name:'Aventura ausente',cover:gameMeta(info.id).cover,star:true});write('pocket:'+absentId,{volume:31,sizes:{A:140}});write('gba-visual-settings:'+absentId,{opacity:0.4});window.seedDone=false;historyDb().then(db=>{const tx=db.transaction('history','readwrite');tx.objectStore('history').put({game:absentId,time:987654,bytes:new Uint8Array([7,8,9]),name:'Ponto ausente'});tx.oncomplete=()=>{db.close();window.seedDone=true}});openFullBackup()");
+        waitJs(app,"window.seedDone");
+        File archive=new File(getTargetContext().getCacheDir(),"complete-backup.zip");
+        ActivityMonitor exportMonitor=new ActivityMonitor(){
+            @Override public ActivityResult onStartActivity(Intent intent){
+                if(Intent.ACTION_CREATE_DOCUMENT.equals(intent.getAction()))return new ActivityResult(Activity.RESULT_OK,new Intent().setData(Uri.fromFile(archive)));
+                return null;
+            }
+        };
+        addMonitor(exportMonitor);js(app,"exportFullBackup()");
+        waitJs(app,"!completeBackupBusy && el('full-backup-status').textContent==='Backup completo exportado.'");removeMonitor(exportMonitor);
+        try(java.util.zip.ZipFile zip=new java.util.zip.ZipFile(archive)){
+            require(zip.getEntry("manifest.json")!=null&&zip.getEntry("cartridges.json")!=null&&zip.getEntry("point-0.json")!=null,"Full backup incomplete");
+            java.util.Enumeration<? extends java.util.zip.ZipEntry> entries=zip.entries();while(entries.hasMoreElements()){
+                String n=entries.nextElement().getName();require(n.equals("manifest.json")||n.equals("cartridges.json")||n.matches("point-[0-9]+\\.json"),"Unexpected file/ROM in backup");
+            }
+        }
+        try(FileOutputStream out=new FileOutputStream(absentSave)){out.write(new byte[]{0});}
+        js(app,"localStorage.removeItem('meta:'+absentId);localStorage.removeItem('pocket:'+absentId);localStorage.removeItem('gba-visual-settings:'+absentId);window.seedDone=false;historyDb().then(db=>{const tx=db.transaction('history','readwrite');tx.objectStore('history').delete([absentId,987654]);tx.oncomplete=()=>{db.close();window.seedDone=true}})");waitJs(app,"window.seedDone");
+        runOnMainSync(()->app.onActivityResult(18,Activity.RESULT_OK,new Intent().setData(Uri.fromFile(archive))));
+        waitJs(app,"!completeBackupBusy && el('full-backup-status').textContent.startsWith('Backup restaurado.')");
+        try(FileInputStream in=new FileInputStream(absentSave)){require(in.read()==42,"Missing-ROM cartridge not restored");}
+        require("true".equals(js(app,"gameMeta(absentId).name==='Aventura ausente' && !!gameMeta(absentId).cover && read('pocket:'+absentId,{}).volume===31 && read('gba-visual-settings:'+absentId,{}).opacity===0.4 && !Object.hasOwn(JSON.parse(Android.library()),absentId) && !el('waiting-games').hidden")),"Missing-ROM metadata or catalog incorrect");
+        js(app,"window.restoredPoint=false;historyDb().then(async db=>{const p=await query(db,s=>s.get([absentId,987654]));window.restoredPoint=Array.from(p.bytes).join(',')==='7,8,9';window.fullCount=await query(db,s=>s.count());db.close()})");waitJs(app,"window.restoredPoint");
+        js(app,"el('full-backup-status').textContent='Again'");
+        runOnMainSync(()->app.onActivityResult(18,Activity.RESULT_OK,new Intent().setData(Uri.fromFile(archive))));
+        waitJs(app,"el('full-backup-status').textContent.startsWith('Backup restaurado.')");
+        js(app,"window.noDuplicates=false;historyDb().then(async db=>{window.noDuplicates=(await query(db,s=>s.count()))===window.fullCount;db.close()})");waitJs(app,"window.noDuplicates");
+        File bad=new File(getTargetContext().getCacheDir(),"bad-full.zip");
+        try(java.util.zip.ZipOutputStream zip=new java.util.zip.ZipOutputStream(new FileOutputStream(bad))){zip.putNextEntry(new java.util.zip.ZipEntry("../manifest.json"));zip.write("{}".getBytes());zip.closeEntry();}
+        runOnMainSync(()->app.onActivityResult(18,Activity.RESULT_OK,new Intent().setData(Uri.fromFile(bad))));
+        waitJs(app,"el('full-backup-status').textContent.startsWith('Falha no backup completo:')");
+        try(FileInputStream in=new FileInputStream(absentSave)){require(in.read()==42,"Invalid backup modified cartridge");}
+        require("true".equals(js(app,"read('pocket:'+absentId,{}).volume===31")),"Invalid backup modified settings");
+        // The same hash selects the retained save, even without a library entry.
+        String original=new org.json.JSONObject(app.new Bridge().info()).getString("id");
+        app.getPreferences(Activity.MODE_PRIVATE).edit().putString("romId",missing).commit();
+        try {require(new org.json.JSONObject(app.new Bridge().loadFiles()).has("mGBA/"+missing+".srm"),"Retained save is not accessible by ROM hash");}
+        finally {app.getPreferences(Activity.MODE_PRIVATE).edit().putString("romId",original).commit();}
+        js(app,"fullBackupResult('Backup restaurado e validado.');dialog.close();el('waiting-games').scrollIntoView({block:'center'})");Thread.sleep(500);capture("full-backup.png");
+    }
+
     private int colorCount(android.graphics.Bitmap bitmap, int channel) {
         int count=0;
         for(int y=0;y<bitmap.getHeight();y+=3)for(int x=0;x<bitmap.getWidth();x+=3){
@@ -324,8 +372,9 @@ public class OfflineSmokeRunner extends Instrumentation {
             imageValues.put(android.provider.MediaStore.Images.Media.MIME_TYPE,"image/png");
             Uri coverUri = getTargetContext().getContentResolver().insert(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI,imageValues);
             require(coverUri != null,"Cannot create cover test image");
-            android.graphics.Bitmap coverBitmap=android.graphics.Bitmap.createBitmap(48,64,android.graphics.Bitmap.Config.ARGB_8888);
+            android.graphics.Bitmap coverBitmap=android.graphics.Bitmap.createBitmap(96,64,android.graphics.Bitmap.Config.ARGB_8888);
             coverBitmap.eraseColor(android.graphics.Color.CYAN);
+            for(int y=0;y<64;y++)for(int x=48;x<96;x++)coverBitmap.setPixel(x,y,android.graphics.Color.MAGENTA);
             try(java.io.OutputStream out=getTargetContext().getContentResolver().openOutputStream(coverUri)){coverBitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,out);}
             coverBitmap.recycle();
             java.util.concurrent.atomic.AtomicBoolean chooserOpened=new java.util.concurrent.atomic.AtomicBoolean();
@@ -352,7 +401,12 @@ public class OfflineSmokeRunner extends Instrumentation {
             for(int i=0;i<50&&!chooserOpened.get();i++)Thread.sleep(100);
             require(chooserOpened.get(),"Cover chooser did not open");
             Thread.sleep(1500);
-            js(app,"Array.from(detail.querySelectorAll('button')).find(b=>b.textContent==='Salvar').click()");
+            waitJs(app,"!!el('cover-preview') && !el('cover-preview').parentElement.hidden && !el('save-game-details').disabled");
+            require("true".equals(js(app,"(()=>{const c=el('cover-preview');window.coverBefore=c.toDataURL();el('cover-zoom').value=180;el('cover-zoom').dispatchEvent(new Event('input'));el('cover-x').value=0;el('cover-x').dispatchEvent(new Event('input'));return c.toDataURL()!==window.coverBefore})()")),"Cover crop did not change pixels");
+            require("true".equals(js(app,"el('cover-center').click();el('cover-x').value==='50' && el('cover-y').value==='50'")),"Cover centering failed");
+            js(app,"window.expectedCover=el('cover-preview').toDataURL('image/jpeg',.9);el('cover-preview').scrollIntoView({block:'center'})");Thread.sleep(500);capture("cover-crop.png");
+            js(app,"el('save-game-details').click()");
+            require("true".equals(js(app,"gameMeta(info.id).cover===window.expectedCover")),"Saved cover differs from preview");
             waitJs(app,"!!gameMeta(info.id).cover && !!el('list').querySelector('.game-cover img')");
             capture("library-covers.png");
             removeMonitor(coverMonitor);
@@ -387,6 +441,16 @@ public class OfflineSmokeRunner extends Instrumentation {
             waitJs(app,"!el('load-point').disabled");
             js(app,"el('reopen').click();el('load-point').click()");
             waitJs(app,"el('checkpoint-status').textContent==='Save restaurado.' && el('settings-panel').hidden");
+            require("true".equals(js(app,"JSON.parse(Android.deviceStatus()).battery>=-1 && JSON.parse(Android.deviceStatus()).battery<=100")),"Invalid battery indicator");
+            js(app,"for(const key of ['hudBattery','hudClock','hudPerformance']){el('pref-'+key).checked=true;el('pref-'+key).dispatchEvent(new Event('input'))}updateHud()");
+            waitJs(app,"/^[0-9]+ FPS$/.test(el('hud-performance').textContent)");
+            require("true".equals(js(app,"!el('hud-battery').hidden && !el('hud-clock').hidden && /[0-9]{2}:[0-9]{2}/.test(el('hud-clock').textContent)")),"HUD values missing");
+            capture("game-indicators.png");
+            for(String key:new String[]{"hudBattery","hudClock","hudPerformance"}){
+                js(app,"el('pref-"+key+"').checked=false;el('pref-"+key+"').dispatchEvent(new Event('input'))");
+                require("true".equals(js(app,"read(profileKey,{})."+key+"===false")),"HUD preference not saved");
+            }
+            require("true".equals(js(app,"el('game-hud').hidden")),"All-hidden HUD still visible");
             // Destructive actions must be cancellable, scoped, and leave cartridge saves intact.
             js(app,"window.bulkSeed=false;saveQuery('readwrite',s=>s.put({game:'other-rom-test',time:123,bytes:new Uint8Array([1])})).then(()=>window.bulkSeed=true);window.batteryBefore=Android.loadFiles();window.profileBefore=localStorage.getItem(profileKey);historyView()");
             waitJs(app,"window.bulkSeed && !!el('erase-all-saves')");
@@ -406,6 +470,7 @@ public class OfflineSmokeRunner extends Instrumentation {
             js(app,"historyBox.close();leaveGame()");
             waitJs(app,"!!el('library-count')");
             capture("library-redesign.png");
+            fullBackupTests(app);
             status.putString("stream","\nOffline ROM import, >120 emulated frames, reopen, invalid import rollback and persistent saves passed.\n");
             sendStatus(0,status);
             Bundle result=new Bundle();result.putString("stream","\nOK (1 test)\n"); finish(Activity.RESULT_OK,result);
@@ -415,3 +480,4 @@ public class OfflineSmokeRunner extends Instrumentation {
         } finally { if(activity!=null){final Activity app=activity;runOnMainSync(app::finish);} }
     }
 }
+

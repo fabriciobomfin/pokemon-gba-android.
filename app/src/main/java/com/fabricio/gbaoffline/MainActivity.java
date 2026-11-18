@@ -32,12 +32,15 @@ public class MainActivity extends Activity {
     private final ExecutorService imports = Executors.newSingleThreadExecutor();
     WebView web;
     private android.webkit.ValueCallback<Uri[]> coverCallback;
+    private FullBackup fullBackup;
+    private volatile boolean fullBackupBusy;
     private boolean importing;
     private boolean backgrounded;
     private int pauseGeneration;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
+        fullBackup = new FullBackup(this);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         web = new WebView(this);
         android.widget.FrameLayout frame = new android.widget.FrameLayout(this);
@@ -110,6 +113,33 @@ public class MainActivity extends Activity {
         return "application/octet-stream";
     }
     public class Bridge {
+        @JavascriptInterface public String deviceStatus() {
+            try {
+                Intent battery=registerReceiver(null,new android.content.IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+                int level=battery==null?-1:battery.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL,-1);
+                int scale=battery==null?0:battery.getIntExtra(android.os.BatteryManager.EXTRA_SCALE,0);
+                int state=battery==null?0:battery.getIntExtra(android.os.BatteryManager.EXTRA_STATUS,0);
+                return new JSONObject().put("battery",level<0||scale<=0?-1:Math.round(100f*level/scale)).put("charging",state==android.os.BatteryManager.BATTERY_STATUS_CHARGING||state==android.os.BatteryManager.BATTERY_STATUS_FULL).toString();
+            }catch(Exception e){return "{\"battery\":-1,\"charging\":false}";}
+        }
+        @JavascriptInterface public boolean fullBackupRequest(boolean export,String metadata,int count) {
+            if(playing||importing||fullBackupBusy)return false;
+            try{if(export)fullBackup.prepareExport(metadata,count);}catch(Exception e){notifyUser(e.getMessage());return false;}
+            fullBackupBusy=true;
+            runOnUiThread(()->{
+                Intent intent=new Intent(export?Intent.ACTION_CREATE_DOCUMENT:Intent.ACTION_OPEN_DOCUMENT);
+                intent.addCategory(Intent.CATEGORY_OPENABLE);intent.setType(export?"application/zip":"*/*");
+                if(export)intent.putExtra(Intent.EXTRA_TITLE,"Fire-Game-Backup-Completo.zip");
+                try{startActivityForResult(intent,export?17:18);}catch(android.content.ActivityNotFoundException e){fullBackupDone("Nenhum seletor de arquivos disponível.");}
+            });return true;
+        }
+        @JavascriptInterface public String fullBackupManifest(){return fullBackup.manifest();}
+        @JavascriptInterface public String fullBackupPoint(int index){try{return fullBackup.point(index);}catch(Exception e){return "";}}
+        @JavascriptInterface public boolean fullBackupInstall(){return fullBackupBusy&&!playing&&fullBackup.install();}
+        @JavascriptInterface public boolean fullBackupRollback(){return fullBackup.rollback();}
+        @JavascriptInterface public boolean fullBackupFinish(){return fullBackup.finish();}
+        @JavascriptInterface public void fullBackupComplete(String message){fullBackupDone(message);}
+
         @JavascriptInterface public String library() {
             JSONObject games = new JSONObject();
             for (java.util.Map.Entry<String,?> entry : getPreferences(MODE_PRIVATE).getAll().entrySet())
@@ -133,6 +163,7 @@ public class MainActivity extends Activity {
         }
         @JavascriptInterface public void select(String id) {
             runOnUiThread(() -> {
+                if(fullBackupBusy)return;
                 if (id.equals(getPreferences(MODE_PRIVATE).getString("romId",""))) { play(); return; }
                 if (id.matches("[a-f0-9]{64}")) {
                     File file = new File(getFilesDir(), id + "." + getPreferences(MODE_PRIVATE).getString("system."+id, "gba"));
@@ -173,7 +204,7 @@ public class MainActivity extends Activity {
         }
         @JavascriptInterface public void pick() {
             runOnUiThread(() -> {
-                if (importing) return;
+                if (importing || fullBackupBusy) return;
                 Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
                 intent.setType("*/*");
                 intent.addCategory(Intent.CATEGORY_OPENABLE);
@@ -191,7 +222,7 @@ public class MainActivity extends Activity {
             return result.toString();
         }
         @JavascriptInterface public void play() {
-            runOnUiThread(() -> { if (!importing && new File(getFilesDir(), "game.gba").isFile()) openGame(); });
+            runOnUiThread(() -> { if (!importing && !fullBackupBusy && new File(getFilesDir(), "game.gba").isFile()) openGame(); });
         }
         @JavascriptInterface public void home() { runOnUiThread(() -> { playing = false; setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT); immersive(false); web.loadUrl(HOME); }); }
         @JavascriptInterface public boolean saveFiles(String json) {
@@ -269,6 +300,20 @@ public class MainActivity extends Activity {
     }
     @Override protected void onActivityResult(int request, int result, Intent data) {
         super.onActivityResult(request, result, data);
+        if(request==17||request==18){
+            if(result!=RESULT_OK||data==null||data.getData()==null){fullBackupDone("Operação cancelada.");return;}
+            fullBackupBusy=true;
+            Uri uri=data.getData();
+            imports.execute(()->{
+                try{
+                    if(request==17){fullBackup.exportTo(getContentResolver().openOutputStream(uri,"wt"));fullBackupDone("Backup completo exportado.");}
+                    else{
+                        fullBackup.importFrom(getContentResolver().openInputStream(uri));
+                        runOnUiThread(()->web.evaluateJavascript("restoreFullBackup()",null));
+                    }
+                }catch(Exception e){fullBackupDone("Falha no backup completo: "+e.getMessage());}
+            });return;
+        }
         if (request == 15) {
             if (coverCallback != null) {
                 coverCallback.onReceiveValue(result == RESULT_OK && data != null && data.getData() != null ? new Uri[]{data.getData()} : null);
@@ -317,6 +362,11 @@ public class MainActivity extends Activity {
         if (request == PICK_ROM && result == RESULT_OK && data != null && data.getData() != null) importRom(data.getData());
     }
 
+    private void fullBackupDone(String message){
+        fullBackupBusy=false;
+        runOnUiThread(()->{if(!isDestroyed())web.evaluateJavascript("fullBackupResult("+JSONObject.quote(message)+")",null);});
+        notifyUser(message);
+    }
     private void notifyUser(String message) {
         runOnUiThread(() -> Toast.makeText(this,message,Toast.LENGTH_LONG).show());
     }
@@ -451,4 +501,5 @@ public class MainActivity extends Activity {
         super.onDestroy();
     }
 }
+
 

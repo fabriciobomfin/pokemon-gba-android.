@@ -6,8 +6,8 @@ android {
         applicationId 'com.fabricio.firegame.stable'
         minSdk 24
         targetSdk 35
-        versionCode = (project.findProperty('fireVersionCode') ?: '18').toInteger()
-        versionName '3.5'
+        versionCode = (project.findProperty('fireVersionCode') ?: '19').toInteger()
+        versionName '3.6'
         testInstrumentationRunner 'com.fabricio.gbaoffline.OfflineSmokeRunner'
     }
     buildTypes {
@@ -20,4 +20,5 @@ android {
     }
     androidResources { noCompress 'data', 'wasm' }
 }
+
 
