@@ -93,7 +93,25 @@ public class OfflineSmokeRunner extends Instrumentation {
         app.getPreferences(Activity.MODE_PRIVATE).edit().putString("romId",missing).commit();
         try {require(new org.json.JSONObject(app.new Bridge().loadFiles()).has("mGBA/"+missing+".srm"),"Retained save is not accessible by ROM hash");}
         finally {app.getPreferences(Activity.MODE_PRIVATE).edit().putString("romId",original).commit();}
-        js(app,"fullBackupResult('Backup restaurado e validado.');dialog.close();el('waiting-games').scrollIntoView({block:'center'})");Thread.sleep(500);capture("full-backup.png");
+        // Interrupted native swap rolls back; a committed swap survives recovery cleanup.
+        FullBackup recovery=new FullBackup(app);
+        try(FileInputStream in=new FileInputStream(archive)){recovery.importFrom(in);}
+        try(FileOutputStream out=new FileOutputStream(absentSave)){out.write(new byte[]{77});}
+        require(recovery.install(),"Recovery test install failed");
+        new FullBackup(app);
+        try(FileInputStream in=new FileInputStream(absentSave)){require(in.read()==77,"Interrupted restore did not roll back");}
+        try(FileInputStream in=new FileInputStream(archive)){recovery.importFrom(in);}
+        require(recovery.install()&&recovery.finish(),"Recovery test commit failed");
+        try(FileOutputStream out=new FileOutputStream(new File(app.getFilesDir(),"full-backup-pending"))){out.write(recovery.committed().getBytes("UTF-8"));}
+        new FullBackup(app);
+        try(FileInputStream in=new FileInputStream(absentSave)){require(in.read()==42,"Committed restore was rolled back");}
+        js(app,"write('full-backup-rollback',{token:Android.fullBackupCommitted(),previous:{['pocket:'+absentId]:JSON.stringify({volume:9})}});location.reload()");
+        waitJs(app,"!!el('full-backup-open') && typeof openFullBackup==='function' && !localStorage.getItem('full-backup-rollback')");
+        require("true".equals(js(app,"read('pocket:'+'a'.repeat(64),{}).volume===31 && !localStorage.getItem('full-backup-rollback')")),"Committed preferences reverted on restart");
+        js(app,"write('full-backup-rollback',{token:'interrupted',previous:{['pocket:'+'a'.repeat(64)]:JSON.stringify({volume:31})}});write('pocket:'+'a'.repeat(64),{volume:9});location.reload()");
+        waitJs(app,"!!el('full-backup-open') && typeof openFullBackup==='function' && !localStorage.getItem('full-backup-rollback')");
+        require("true".equals(js(app,"read('pocket:'+'a'.repeat(64),{}).volume===31 && !localStorage.getItem('full-backup-rollback')")),"Interrupted preference restore did not recover");
+        js(app,"el('waiting-games').scrollIntoView({block:'center'})");Thread.sleep(500);capture("full-backup.png");
     }
 
     private int colorCount(android.graphics.Bitmap bitmap, int channel) {
@@ -316,7 +334,7 @@ public class OfflineSmokeRunner extends Instrumentation {
             require("true".equals(js(app,"document.querySelectorAll('#console button.pad').length===7 && document.querySelector('#console .action').getBoundingClientRect().width>30")),"Touch controls missing");
             require("true".equals(js(app,"document.body.classList.contains('focus') && !document.getElementById('app-header').offsetHeight && document.getElementById('speed-button').offsetHeight>=40")), "Fullscreen and speed shortcut missing");
             require("true".equals(js(app,"var speedBtn=document.getElementById('speed-button'); speedBtn.click(); speedBtn.textContent==='2×' && document.getElementById('settings-panel').hidden")), "Direct speed change failed");
-            require("true".equals(js(app,"document.getElementById('reopen').click(); !!document.querySelector('#reopen svg path') && document.querySelectorAll('.category summary svg path').length===5 && !document.getElementById('settings-panel').hidden && !document.querySelector('.category[open]')")), "Settings overview failed");
+            require("true".equals(js(app,"document.getElementById('reopen').click(); !!document.querySelector('#reopen svg path') && document.querySelectorAll('.category summary svg path').length===6 && !!el('pref-hudBattery') && !!el('pref-hudClock') && !!el('pref-hudPerformance') && !document.getElementById('settings-panel').hidden && !document.querySelector('.category[open]')")), "Settings overview failed");
             require("true".equals(js(app,"document.querySelector('.category summary').click(); document.getElementById('pref-fit').offsetHeight>0 && !document.getElementById('pref-volume').offsetHeight")), "Video category failed");
             require("true".equals(js(app,"Array.from(document.querySelectorAll('#quick button')).map(b=>b.id).join()==='save-point,load-point,all-points' && el('load-point').disabled")), "Quick menu order failed");
             require("true".equals(js(app,"[[0,-.4,4],[0,.4,5],[-.4,0,6],[.4,0,7]].every(([x,y,d])=>directionCodes(x,y,false).join()===String(d)) && directionCodes(.32,.45,false).length===1 && directionCodes(.4,.4,true).length===2")), "Directional mapping failed");

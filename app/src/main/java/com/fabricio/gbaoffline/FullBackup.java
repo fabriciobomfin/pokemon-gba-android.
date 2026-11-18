@@ -19,8 +19,15 @@ final class FullBackup {
         previous=new File(app.getFilesDir(),"saves-before-full-backup");
         next=new File(app.getFilesDir(),"saves-next-full-backup");
         marker=new File(app.getFilesDir(),"full-backup-pending");
-        if(marker.exists())rollback();
+        if(marker.exists()){
+            String token="";
+            try(InputStream in=new FileInputStream(marker)){token=new String(read(in,200),"UTF-8");}catch(IOException ignored){}
+            if(!token.isEmpty()&&token.equals(committed())){
+                try{remove(previous);remove(next);remove(marker);}catch(IOException ignored){}
+            }else rollback();
+        }
     }
+    String committed(){return app.getPreferences(android.app.Activity.MODE_PRIVATE).getString("fullBackupCommitted", "");}
     private File live(){return new File(app.getFilesDir(),"saves");}
     static boolean id(String value){return value.matches("[a-f0-9]{64}");}
     static boolean path(String name){
@@ -102,7 +109,7 @@ final class FullBackup {
                 write(new File(stage,"point-"+i+".json"),bytes);
             }
             if(zip.getNextEntry()!=null)throw new IOException("Conteúdo inesperado no backup.");
-            manifest=m;cartridges=saves;
+            m.put("restoreToken",UUID.randomUUID().toString());manifest=m;cartridges=saves;
         }catch(Exception e){remove(stage);throw e;}
     }
     String manifest(){return manifest==null?"{}":manifest.toString();}
@@ -112,17 +119,18 @@ final class FullBackup {
             if(cartridges==null||marker.exists())return false;
             remove(next);remove(previous);if(!next.mkdirs())return false;copy(live(),next);
             Iterator<String> ids=cartridges.keys();while(ids.hasNext()){String id=ids.next();JSONObject files=cartridges.getJSONObject(id);Iterator<String> names=files.keys();while(names.hasNext()){String name=names.next();write(new File(new File(next,id),name),android.util.Base64.decode(files.getString(name),android.util.Base64.DEFAULT));}}
-            write(marker,new byte[]{1});
+            write(marker,manifest.getString("restoreToken").getBytes("UTF-8"));
             if(live().exists()){if(!live().renameTo(previous))throw new IOException("Falha ao proteger os saves atuais.");}else if(!previous.mkdirs())throw new IOException("Falha ao criar proteção.");
             if(!next.renameTo(live()))throw new IOException("Falha ao aplicar os saves.");return true;
-        }catch(Exception e){rollback();return false;}
+        }catch(Exception e){if(marker.exists())rollback();else try{remove(next);}catch(IOException ignored){}return false;}
     }
     boolean rollback(){
         try{if(previous.exists()){remove(live());if(!previous.renameTo(live()))return false;}remove(next);if(marker.exists()&&!marker.delete())return false;return true;}catch(IOException e){return false;}
     }
     boolean finish(){
-        // Removing the journal marks the committed native state before cleaning the old copy.
-        if(marker.exists()&&!marker.delete())return false;
-        try{remove(previous);remove(stage);}catch(IOException ignored){}cartridges=null;return true;
+        // A durable commit token coordinates Android saves with the browser preference journal.
+        String token=manifest==null?"":manifest.optString("restoreToken");
+        if(token.isEmpty()||!app.getPreferences(android.app.Activity.MODE_PRIVATE).edit().putString("fullBackupCommitted",token).commit())return false;
+        try{remove(marker);remove(previous);remove(stage);}catch(IOException ignored){}cartridges=null;return true;
     }
 }

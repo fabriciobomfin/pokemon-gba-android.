@@ -47,6 +47,7 @@ function validateFullMetadata(manifest){
   if(!backupPreferenceKey(key)||typeof value!=='string')throw Error('Configuração não reconhecida.');
   const parsed=JSON.parse(value);
   if(key.includes(':')&&!plain(parsed))throw Error('Perfil inválido.');
+  if(key.startsWith('meta:')){for(const field of ['name','notes','cover'])if(parsed[field]!==undefined&&typeof parsed[field]!=='string')throw Error('Dados do jogo inválidos.')}
   if(key.startsWith('meta:')&&parsed.cover&&!/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(parsed.cover))throw Error('Capa inválida.');
  }
  for(const [id,entry] of Object.entries(metadata.catalog))if(!/^[a-f0-9]{64}$/.test(id)||!plain(entry)||typeof entry.name!=='string'||entry.name.length>500||!['gba','nds'].includes(entry.system))throw Error('Catálogo inválido.');
@@ -67,7 +68,7 @@ async function restoreFullBackup(){
   previous={};for(const key of Object.keys(metadata.preferences))previous[key]=localStorage.getItem(key);
   previous['restored-game-catalog']=localStorage.getItem('restored-game-catalog');
   // Journal permits recovery if Android terminates the app during restoration.
-  localStorage.setItem('full-backup-rollback',JSON.stringify(previous));
+  localStorage.setItem('full-backup-rollback',JSON.stringify({token:manifest.restoreToken,previous}));
   for(const [key,value] of Object.entries(metadata.preferences))localStorage.setItem(key,value);
   write('restored-game-catalog',{...read('restored-game-catalog',{}),...metadata.catalog});
   if(!Android.fullBackupInstall())throw Error('Não foi possível aplicar os saves; os originais foram preservados.');nativeInstalled=true;
@@ -77,14 +78,15 @@ async function restoreFullBackup(){
    for(const point of points){const request=history.get([point.game,point.time]);request.onsuccess=()=>{if(!request.result)history.add(point)}}
   });
   if(!Android.fullBackupFinish())throw Error('Não foi possível finalizar a restauração.');nativeInstalled=false;
-  localStorage.removeItem('full-backup-rollback');
+  localStorage.removeItem('full-backup-rollback');previous=null;
   applyTheme(read('fire-game-theme','ameixa'));render();
   const missing=Object.keys(metadata.catalog).filter(id=>!Object.hasOwn(games,id)).length;
   Android.fullBackupComplete('Backup restaurado. '+manifest.count+' pontos processados.'+(missing?' Dados de '+missing+' jogo(s) aguardam a importação da ROM.':''));
  }catch(e){
   if(nativeInstalled)Android.fullBackupRollback();
-  if(previous)for(const [key,value] of Object.entries(previous)){if(value===null)localStorage.removeItem(key);else localStorage.setItem(key,value)}
-  localStorage.removeItem('full-backup-rollback');Android.fullBackupComplete('Falha ao restaurar: '+e.message);
+  localStorage.removeItem('full-backup-rollback');
+  if(previous){for(const key of Object.keys(previous))localStorage.removeItem(key);for(const [key,value] of Object.entries(previous))if(value!==null)localStorage.setItem(key,value)}
+  Android.fullBackupComplete('Falha ao restaurar: '+e.message);
  }finally{db?.close();setBackupBusy(false)}
 }
 function updateWaitingGames(){
@@ -95,6 +97,18 @@ function updateWaitingGames(){
  for(const [,entry] of waiting)box.append(make('small',entry.name));
 }
 // Restore the old preferences if a previous restore was interrupted before it completed.
-try{const old=JSON.parse(localStorage.getItem('full-backup-rollback')||'null');if(old){for(const [key,value] of Object.entries(old))if(backupPreferenceKey(key)||key==='restored-game-catalog'){if(value===null)localStorage.removeItem(key);else localStorage.setItem(key,value)}localStorage.removeItem('full-backup-rollback');applyTheme(read('fire-game-theme','ameixa'));render()}}catch{}
+try{
+ const journal=JSON.parse(localStorage.getItem('full-backup-rollback')||'null');
+ if(journal){
+  localStorage.removeItem('full-backup-rollback');
+  if(!journal.token||journal.token!==Android.fullBackupCommitted()){
+   const old=journal.previous||journal;
+   const keys=Object.keys(old).filter(key=>backupPreferenceKey(key)||key==='restored-game-catalog');
+   for(const key of keys)localStorage.removeItem(key);
+   for(const key of keys)if(old[key]!==null)localStorage.setItem(key,old[key]);
+  }
+  applyTheme(read('fire-game-theme','ameixa'));render();
+ }
+}catch{}
 el('full-backup-open').onclick=openFullBackup;
 updateWaitingGames();

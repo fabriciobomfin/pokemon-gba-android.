@@ -133,6 +133,7 @@ public class MainActivity extends Activity {
                 try{startActivityForResult(intent,export?17:18);}catch(android.content.ActivityNotFoundException e){fullBackupDone("Nenhum seletor de arquivos disponível.");}
             });return true;
         }
+        @JavascriptInterface public String fullBackupCommitted(){return fullBackup.committed();}
         @JavascriptInterface public String fullBackupManifest(){return fullBackup.manifest();}
         @JavascriptInterface public String fullBackupPoint(int index){try{return fullBackup.point(index);}catch(Exception e){return "";}}
         @JavascriptInterface public boolean fullBackupInstall(){return fullBackupBusy&&!playing&&fullBackup.install();}
