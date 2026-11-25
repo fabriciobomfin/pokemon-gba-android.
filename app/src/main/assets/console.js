@@ -307,7 +307,7 @@ function updateCanvasCrop(){
  if(isDS)return;
  const box=el('game').getBoundingClientRect(),dpr=devicePixelRatio||1;
  const integer=Math.floor(Math.min(box.width*dpr/240,box.height*dpr/160));
- const root=el('game').querySelector('.ejs_parent');
+ const root=el('game').querySelector('.ejs_canvas_parent');
  if(root){root.style.setProperty('--viewport-width',settings.fit==='integer'&&integer>=1?(integer*240/dpr)+'px':'100%');root.style.setProperty('--viewport-height',settings.fit==='integer'&&integer>=1?(integer*160/dpr)+'px':'100%');}
  const aspect=Number(e.gameManager?.getVideoDimensions('aspect'))||1.5;
  const bufferAspect=canvas.width/canvas.height||aspect;

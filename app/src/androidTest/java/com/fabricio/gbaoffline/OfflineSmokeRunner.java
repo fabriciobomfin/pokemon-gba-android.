@@ -337,7 +337,8 @@ public class OfflineSmokeRunner extends Instrumentation {
             require("true".equals(js(app,"document.body.classList.contains('focus') && !document.getElementById('app-header').offsetHeight && document.getElementById('speed-button').offsetHeight>=40")), "Fullscreen and speed shortcut missing");
             require("true".equals(js(app,"var speedBtn=document.getElementById('speed-button'); speedBtn.click(); speedBtn.textContent==='2×' && document.getElementById('settings-panel').hidden")), "Direct speed change failed");
             require("true".equals(js(app,"document.getElementById('reopen').click(); !!document.querySelector('#reopen svg path') && document.querySelectorAll('.category summary svg path').length===6 && !!el('pref-hudBattery') && !!el('pref-hudClock') && !!el('pref-hudPerformance') && !document.getElementById('settings-panel').hidden && !document.querySelector('.category[open]')")), "Settings overview failed");
-            Thread.sleep(500);capture("studio-settings.png");
+            js(app,"EJS_emulator.pause()");Thread.sleep(1400);capture("studio-settings.png");js(app,"EJS_emulator.play()");
+            require("true".equals(js(app,"(()=>{const p=el('settings-panel'),r=p.getBoundingClientRect();return p.contains(document.elementFromPoint(r.left+r.width/2,r.top+40))})()")),"Settings panel is obscured");
             require("true".equals(js(app,"document.querySelector('.category summary').click(); document.getElementById('pref-fit').offsetHeight>0 && !document.getElementById('pref-volume').offsetHeight")), "Video category failed");
             require("true".equals(js(app,"Array.from(document.querySelectorAll('#quick button')).map(b=>b.id).join()==='save-point,load-point,all-points' && el('load-point').disabled")), "Quick menu order failed");
             require("true".equals(js(app,"[[0,-.4,4],[0,.4,5],[-.4,0,6],[.4,0,7]].every(([x,y,d])=>directionCodes(x,y,false).join()===String(d)) && directionCodes(.32,.45,false).length===1 && directionCodes(.4,.4,true).length===2")), "Directional mapping failed");
@@ -367,7 +368,7 @@ public class OfflineSmokeRunner extends Instrumentation {
             require("true".equals(js(app,"settings.screen==='full' && settings.focus && el('screen-choice-full').getAttribute('aria-pressed')==='true' && getComputedStyle(EJS_emulator.canvas).transform==='none'")),"Fullscreen preset stretched the image");
             capture("studio-fullscreen.png");
             js(app,"settings.fit='integer';el('pref-fit').value='integer';persist();apply()");
-            waitJs(app,"(()=>{const r=el('game').querySelector('.ejs_parent').getBoundingClientRect();return Math.abs(r.width/r.height-1.5)<.01 && Math.abs(r.width*devicePixelRatio/240-Math.round(r.width*devicePixelRatio/240))<.02 && r.width<=innerWidth+1 && r.height<=innerHeight+1})()");
+            waitJs(app,"(()=>{const r=el('game').querySelector('.ejs_canvas_parent').getBoundingClientRect();return Math.abs(r.width/r.height-1.5)<.01 && Math.abs(r.width*devicePixelRatio/240-Math.round(r.width*devicePixelRatio/240))<.02 && r.width<=innerWidth+1 && r.height<=innerHeight+1})()");
             Thread.sleep(600);capture("studio-integer.png");
             js(app,"settings.screen='console';settings.fit='contain';settings.orientation='vertical';apply();persist();el('save-shortcut').click()");
             waitJs(app,"innerHeight>innerWidth && Math.abs(el('game').getBoundingClientRect().width/el('game').getBoundingClientRect().height-1.5)<.05");
