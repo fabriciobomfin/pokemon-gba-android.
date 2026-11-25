@@ -34,6 +34,7 @@ public class MainActivity extends Activity {
     private android.webkit.ValueCallback<Uri[]> coverCallback;
     private FullBackup fullBackup;
     private volatile boolean fullBackupBusy;
+    private boolean immersiveMode;
     private boolean importing;
     private boolean backgrounded;
     private int pauseGeneration;
@@ -47,7 +48,8 @@ public class MainActivity extends Activity {
         frame.setBackgroundColor(android.graphics.Color.rgb(7,12,22));
         frame.addView(web);
         frame.setOnApplyWindowInsetsListener((view, insets) -> {
-            view.setPadding(insets.getSystemWindowInsetLeft(), insets.getSystemWindowInsetTop(), insets.getSystemWindowInsetRight(), insets.getSystemWindowInsetBottom());
+            if(playing&&immersiveMode)view.setPadding(0,0,0,0);
+            else view.setPadding(insets.getSystemWindowInsetLeft(), insets.getSystemWindowInsetTop(), insets.getSystemWindowInsetRight(), insets.getSystemWindowInsetBottom());
             return insets.consumeSystemWindowInsets();
         });
         setContentView(frame);
@@ -176,7 +178,12 @@ public class MainActivity extends Activity {
             runOnUiThread(() -> { if (playing) setRequestedOrientation(value == 1 ? ActivityInfo.SCREEN_ORIENTATION_PORTRAIT : value == 2 ? ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE : ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED); });
         }
         @JavascriptInterface public void immersive(boolean value) {
-            runOnUiThread(() -> getWindow().getDecorView().setSystemUiVisibility(value ? 5894 : 0));
+            runOnUiThread(() -> {
+                immersiveMode=value;
+                if(android.os.Build.VERSION.SDK_INT>=28){WindowManager.LayoutParams p=getWindow().getAttributes();p.layoutInDisplayCutoutMode=value?WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES:WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_DEFAULT;getWindow().setAttributes(p);}
+                getWindow().getDecorView().setSystemUiVisibility(value ? 5894 : 0);
+                ((android.view.View)web.getParent()).requestApplyInsets();
+            });
         }
         @JavascriptInterface public void pulse() {
             runOnUiThread(() -> web.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY));

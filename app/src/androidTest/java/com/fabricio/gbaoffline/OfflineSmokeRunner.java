@@ -282,7 +282,9 @@ public class OfflineSmokeRunner extends Instrumentation {
             require("true".equals(js(app,"openPage('categories'); !el('categories-page').hidden && el('game-count').textContent==='0 jogos'")),"Empty category count");
             require("true".equals(js(app,"el('gba-category').click(); !el('home-page').hidden && el('recent').hidden")),"Category navigation failed");
             require("true".equals(js(app,"document.querySelector('[data-page=themes]').click(); Array.from(el('gallery').children).every(b=>{b.click();return b.getAttribute('aria-pressed')==='true' && document.documentElement.dataset.theme===b.dataset.id && read('fire-game-theme','')===b.dataset.id && (!themes[b.dataset.id].pattern || getComputedStyle(b.firstChild).backgroundImage.includes('gradient'))})")),"Theme gallery selection failed");
-            js(app,"document.querySelector('[data-id=ciano]').click();openPage('home')");
+            js(app,"document.querySelector('[data-id=ciano]').click();window.scrollTo(0,0)");Thread.sleep(500);capture("studio-themes.png");
+            require("true".equals(js(app,"document.querySelectorAll('.mini-display').length===14 && !!document.querySelector('.brand-mark svg')")),"New theme previews or brand missing");
+            js(app,"openPage('home');window.scrollTo(0,0)");Thread.sleep(500);capture("studio-empty.png");
             // ARM homebrew draws red on a new cartridge and green when SRAM[0] is 0x5a.
             // Holding A writes that byte through the GBA memory bus.
             byte[] rom = new byte[512];
@@ -335,6 +337,7 @@ public class OfflineSmokeRunner extends Instrumentation {
             require("true".equals(js(app,"document.body.classList.contains('focus') && !document.getElementById('app-header').offsetHeight && document.getElementById('speed-button').offsetHeight>=40")), "Fullscreen and speed shortcut missing");
             require("true".equals(js(app,"var speedBtn=document.getElementById('speed-button'); speedBtn.click(); speedBtn.textContent==='2×' && document.getElementById('settings-panel').hidden")), "Direct speed change failed");
             require("true".equals(js(app,"document.getElementById('reopen').click(); !!document.querySelector('#reopen svg path') && document.querySelectorAll('.category summary svg path').length===6 && !!el('pref-hudBattery') && !!el('pref-hudClock') && !!el('pref-hudPerformance') && !document.getElementById('settings-panel').hidden && !document.querySelector('.category[open]')")), "Settings overview failed");
+            Thread.sleep(500);capture("studio-settings.png");
             require("true".equals(js(app,"document.querySelector('.category summary').click(); document.getElementById('pref-fit').offsetHeight>0 && !document.getElementById('pref-volume').offsetHeight")), "Video category failed");
             require("true".equals(js(app,"Array.from(document.querySelectorAll('#quick button')).map(b=>b.id).join()==='save-point,load-point,all-points' && el('load-point').disabled")), "Quick menu order failed");
             require("true".equals(js(app,"[[0,-.4,4],[0,.4,5],[-.4,0,6],[.4,0,7]].every(([x,y,d])=>directionCodes(x,y,false).join()===String(d)) && directionCodes(.32,.45,false).length===1 && directionCodes(.4,.4,true).length===2")), "Directional mapping failed");
@@ -356,7 +359,16 @@ public class OfflineSmokeRunner extends Instrumentation {
             android.util.Log.i("FireGameLayout",js(app,"JSON.stringify({window:[innerWidth,innerHeight],game:el('game').getBoundingClientRect().toJSON(),canvas:EJS_emulator.canvas.getBoundingClientRect().toJSON(),buffer:[EJS_emulator.canvas.width,EJS_emulator.canvas.height],aspect:EJS_emulator.gameManager.getVideoDimensions('aspect'),fit:document.body.dataset.fit,screen:document.body.dataset.screen})"));
             capture("controls-wide.png");
             require("true".equals(js(app,"getComputedStyle(EJS_emulator.canvas).objectFit==='contain' && settings.fit==='immersive' && document.body.dataset.screen==='full'")),"Fullscreen must preserve complete image");
-            js(app,"EJS_emulator.play()");
+            js(app,"EJS_emulator.play();el('screen-choice-full').click();toggleSettings(false)");
+            Thread.sleep(1200);
+            int[] viewport=new int[2];android.util.DisplayMetrics physical=new android.util.DisplayMetrics();
+            runOnMainSync(()->{app.web.getLocationOnScreen(viewport);app.getWindowManager().getDefaultDisplay().getRealMetrics(physical);});
+            require(viewport[0]==0 && viewport[1]==0 && Math.abs(app.web.getHeight()-physical.heightPixels)<=1,"Immersive Android insets still reserve screen space");
+            require("true".equals(js(app,"settings.screen==='full' && settings.focus && el('screen-choice-full').getAttribute('aria-pressed')==='true' && getComputedStyle(EJS_emulator.canvas).transform==='none'")),"Fullscreen preset stretched the image");
+            capture("studio-fullscreen.png");
+            js(app,"settings.fit='integer';el('pref-fit').value='integer';persist();apply()");
+            waitJs(app,"(()=>{const r=el('game').querySelector('.ejs_parent').getBoundingClientRect();return Math.abs(r.width/r.height-1.5)<.01 && Math.abs(r.width*devicePixelRatio/240-Math.round(r.width*devicePixelRatio/240))<.02 && r.width<=innerWidth+1 && r.height<=innerHeight+1})()");
+            Thread.sleep(600);capture("studio-integer.png");
             js(app,"settings.screen='console';settings.fit='contain';settings.orientation='vertical';apply();persist();el('save-shortcut').click()");
             waitJs(app,"innerHeight>innerWidth && Math.abs(el('game').getBoundingClientRect().width/el('game').getBoundingClientRect().height-1.5)<.05");
             require("true".equals(js(app,"buttons.A.getBoundingClientRect().top>el('game').getBoundingClientRect().bottom && buttons.D.getBoundingClientRect().top>el('game').getBoundingClientRect().bottom && el('reopen').getBoundingClientRect().top>=el('game').getBoundingClientRect().bottom")),"Portrait controls overlap the game");
@@ -427,6 +439,7 @@ public class OfflineSmokeRunner extends Instrumentation {
             require("true".equals(js(app,"gameMeta(info.id).cover===window.expectedCover")),"Saved cover differs from preview");
             waitJs(app,"!!gameMeta(info.id).cover && !!el('list').querySelector('.game-cover img')");
             capture("library-covers.png");
+            js(app,"window.scrollTo(0,0)");Thread.sleep(500);capture("studio-library.png");
             removeMonitor(coverMonitor);
             getTargetContext().getContentResolver().delete(coverUri,null,null);
             // Export via the production document callback, erase the local records, then import.

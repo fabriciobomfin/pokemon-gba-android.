@@ -1,6 +1,6 @@
 const deck=el('console'),panel=el('settings-panel'),profileKey='pocket:'+rom.id;
 deck.setAttribute('aria-label',isDS?'Controle Nintendo DS':'Controle GBA');
-const defaults={skin:'round',accent:'tema',focus:true,theme:'ameixa',orientation:'horizontal',preset:'classic',volume:75,filter:'original',brightness:100,saturation:100,fit:'contain',speed:'1',interval:1,positions:{},sizes:{},screen:'console',haptic:true};
+const defaults={skin:'round',accent:'tema',focus:true,theme:'ameixa',orientation:'horizontal',preset:'classic',volume:75,filter:'original',brightness:100,saturation:100,fit:'contain',speed:'1',interval:1,positions:{},sizes:{},screen:'full',haptic:true};
 let settings=Object.assign({},defaults,read(profileKey,{})),editing=false,activeSeconds=0;
 // Restore this ROM's orientation instead of overwriting its profile.
 if(['cover','fill'].includes(settings.fit))settings.fit='contain';
@@ -162,9 +162,9 @@ setting('skin','Design do controle',choices('round|Disco','cross|Cruz clássica'
 setting('preset','Posição dos botões',choices('classic|Clássica','left|Canhoto','compact|Compacta'));
 setting('theme','Tema completo',Object.entries(themes).map(([id,theme])=>[id,theme.name]));
 setting('orientation','Orientação',choices('auto|Automática','vertical|Em pé','horizontal|Deitado'));
-setting('screen','Área do jogo',choices('console|Console · espaço para controles','full|Tela inteira · controles sobre o jogo'));
+setting('screen','Modo de tela',choices('console|Console · controles separados','full|Tela cheia · imagem máxima'));
 if(isDS){setting('dsMode','Telas do Nintendo DS',choices('single|Uma tela ampliada','overlay|Segunda tela em janela','dual|Duas telas lado a lado / empilhadas'));setting('dsWindowSize','Tamanho da janela DS',[18,45,1],'range');}
-setting('fit','Enquadramento',isDS?choices('contain|Proporção original'):choices('contain|Original · imagem completa','immersive|Tela ampla · sem deformação'));
+setting('fit','Enquadramento',isDS?choices('contain|Proporção original'):choices('contain|Máximo · imagem inteira','integer|Pixels exatos · escala inteira'));
 setting('filter','Imagem',choices('original|Original','lcd|LCD','crt|CRT','mono|Monocromática','warm|Quente'));
 setting('brightness','Brilho da imagem',[50,150,5],'range');setting('saturation','Intensidade das cores',[0,170,5],'range');
 setting('volume','Volume',[0,100,5],'range');
@@ -217,7 +217,7 @@ function placeTools(){
  const centers=new Map();
  visible.forEach((button,i)=>{centers.set(button.id,offset+widths[i]/2);offset+=widths[i]+8;});
  const rowMargin=Math.max(23,...widths.map(width=>width/2))+8;
- const rowTop=!landscape.matches&&settings.screen==='console'?el('game').getBoundingClientRect().bottom+rowMargin:rowMargin;
+ const rowTop=!landscape.matches&&document.body.dataset.screen==='console'?el('game').getBoundingClientRect().bottom+rowMargin:rowMargin;
  for(const button of floats){
   const pos=settings.positions[keyLayout()]?.[button.id];
   const scale=scaleFor(button.id),margin=26*scale;
@@ -290,10 +290,25 @@ for(const id of ids){const b=make('button',id==='D'?'':id==='Mic'?'Mic':id);b.cl
  b.onpointermove=e=>{if(b.hasPointerCapture(e.pointerId))update(e)};
  b.onlostpointercapture=e=>{inputs(e.pointerId,[]);b.classList.remove('pressed');for(const mark of b.children)mark.classList.remove('lit');if(editing)persist()}
 }
+const screenChoices=make('section');screenChoices.id='screen-choices';
+const screenLabel=make('small','COMO VOCÊ QUER JOGAR?');screenChoices.append(screenLabel);
+const screenOptions=make('div');
+for(const [mode,title,caption,icon] of [['console','Console','Controles em área própria','controller'],['full','Tela cheia','Imagem inteira, no máximo','expand']]){
+ const button=action('',()=>{settings.screen=mode;settings.fit='contain';settings.focus=mode==='full';el('pref-screen').value=mode;el('pref-fit').value='contain';el('pref-focus').checked=settings.focus;persist();apply()});
+ button.id='screen-choice-'+mode;button.append(sectionIcon(icon),make('strong',title),make('span',caption));screenOptions.append(button);
+}
+screenChoices.append(screenOptions);panel.querySelector('.panel-head').after(screenChoices);
+const frameNote=make('p','GBA • 3:2 · A imagem inteira é ampliada sem corte ou distorção. Em telas mais largas, as faixas laterais preservam o jogo completo.');frameNote.id='frame-note';if(!isDS)el('pref-fit').closest('.setting').append(frameNote);
+function updateScreenChoices(){for(const mode of ['console','full'])el('screen-choice-'+mode).setAttribute('aria-pressed',String(document.body.dataset.screen===mode));}
+el('pref-screen').addEventListener('input',()=>{if(settings.screen==='full'){settings.focus=true;el('pref-focus').checked=true;}settings.fit='contain';el('pref-fit').value='contain';persist();apply()});
 let observedCanvas;
 function updateCanvasCrop(){
  const e=emulator(),canvas=e?.canvas;if(!canvas)return;
  if(isDS)return;
+ const box=el('game').getBoundingClientRect(),dpr=devicePixelRatio||1;
+ const integer=Math.floor(Math.min(box.width*dpr/240,box.height*dpr/160));
+ const root=el('game').querySelector('.ejs_parent');
+ if(root){root.style.setProperty('--viewport-width',settings.fit==='integer'&&integer>=1?(integer*240/dpr)+'px':'100%');root.style.setProperty('--viewport-height',settings.fit==='integer'&&integer>=1?(integer*160/dpr)+'px':'100%');}
  const aspect=Number(e.gameManager?.getVideoDimensions('aspect'))||1.5;
  const bufferAspect=canvas.width/canvas.height||aspect;
  canvas.style.setProperty('--crop-x',Math.max(1,bufferAspect/aspect));
@@ -309,7 +324,7 @@ function apply(){
  applyDSDisplay();
  if(e?.started){e.volume=settings.mute?0:settings.volume/100;e.setVolume(e.volume)}
  updateSpeed()
- updateCanvasCrop();place()
+ updateCanvasCrop();place();updateScreenChoices()
 }
 landscape.addEventListener('change',apply);
 el('sharp-image').addEventListener('change',apply);el('control-size').addEventListener('input',place);
@@ -320,3 +335,4 @@ window.EJS_onGameStart=()=>{hideEmulatorMenu();refreshCheckpoint();updateMeta(ro
  const e=emulator();if(document.hidden||!e?.started||e.paused)return;activeSeconds++;updateMeta(rom.id,{seconds:(gameMeta(rom.id).seconds||0)+1});if(activeSeconds%Number(settings.interval)===0)saveGame(false);
  clock.textContent=[settings.clock?new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'',settings.timer?Math.floor(activeSeconds/60)+'m '+activeSeconds%60+'s':''].filter(Boolean).join(' · ')
  },1000)};
+

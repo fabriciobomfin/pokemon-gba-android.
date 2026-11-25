@@ -7,6 +7,10 @@ function gameMeta(id){return read('meta:'+id,{})}
 function updateMeta(id,fields){write('meta:'+id,Object.assign(gameMeta(id),fields))}
 
 const iconPaths = {
+ expand: 'M8 3H3v5 M16 3h5v5 M21 16v5h-5 M3 16v5h5',
+ play: 'M8 4l13 8-13 8z',
+ plus: 'M12 4v16 M4 12h16',
+ home: 'M3 11l9-8 9 8 M5 10v11h5v-6h4v6h5V10',
  gear: 'M10 3h4l.65 2.34 1.4.81 2.35-.6 2 3.46-1.7 1.73v1.64l1.7 1.73-2 3.46-2.35-.6-1.4.81L14 21h-4l-.65-2.22-1.4-.81-2.35.6-2-3.46 1.7-1.73v-1.64L3.6 10l2-3.46 2.35.6 1.4-.81z M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0z',
  screen: 'M3 4h18v13H3z M12 17v3 M8 20h8',
  sound: 'M3 9h4l5-4v14l-5-4H3z M15 8a6 6 0 0 1 0 8 M18 5a10 10 0 0 1 0 14',
@@ -29,20 +33,177 @@ function sectionIcon(name) {
 
 // One palette controls the whole interface, including text and console buttons.
 const themes={
- ameixa:{name:'Ameixa',colors:['#120f1e','#251d37','#514263','#fff0d7','#c8b9d2','#ffbd76','#28172a']},
- noite:{name:'Meia-noite',colors:['#080d19','#182438','#364a68','#edf4ff','#a9bcd6','#91bfff','#11253e']},
- roxo:{name:'Roxo',colors:['#130d22','#291b42','#634786','#f5ecff','#c8b4df','#c59aff','#28153f']},
- ciano:{name:'Ciano',colors:['#071b20','#10343d','#2d6370','#e2fbff','#a4cbd3','#68e4ee','#072a30']},
- dourado:{name:'Dourado',colors:['#19150c','#302817','#6c5931','#fff3d5','#d0bd92','#f6c861','#2c210a']},
- azul:{name:'Azul oceano',colors:['#081727','#132d49','#315a82','#edf6ff','#adc5df','#70b9ff','#102b48']},
- jade:{name:'Jade',colors:['#0b1d18','#18382c','#39634c','#eaf9e9','#b1cdb5','#8fe2ad','#132f21']},
- brasa:{name:'Brasa',colors:['#23120e','#3e231a','#80503a','#fff1df','#ddbda7','#ffab70','#341b0c']},
- rubi:{name:'Rubi',colors:['#240f19','#401d2b','#814258','#fff0f2','#d6b2bd','#ff91ad','#3d1321']},
- rosa:{name:'Rosa',colors:['#21121f','#3a2338','#75536f','#fff0fb','#d4bad0','#f6a7d6','#381b2d']},
- circuito:{name:'Circuito',pattern:'repeating-linear-gradient(135deg,transparent 0 13px,#48d9aa28 13px 15px,transparent 15px 26px),repeating-linear-gradient(45deg,#092722 0 28px,#104138 28px 30px)',colors:['#071e1b','#143630','#356558','#e6fff3','#a3cdbd','#83f1b8','#0a2d1b']},
- aurora:{name:'Aurora',pattern:'radial-gradient(ellipse at 12% 100%,#096d7999,transparent 60%),radial-gradient(ellipse at 80% 10%,#7048a299,transparent 65%),linear-gradient(135deg,#0c2034,#21132e)',colors:['#101b31','#252641','#514d73','#eff2ff','#c0c3db','#a7dcec','#14283a']},
- carbono:{name:'Fibra de carbono',pattern:'repeating-linear-gradient(45deg,#20232a 0 4px,#14171c 4px 8px,#1c2026 8px 12px)',colors:['#121417','#26282e','#555960','#fcf4df','#cdc4ad','#f5c554','#2a210b']},
- grafite:{name:'Grafite',colors:['#14171c','#272d35','#515c69','#f0f3f7','#bbc4d0','#becbdd','#1c2735']}
+ "ameixa": {
+  "name": "Ameixa",
+  "colors": [
+   "#14111c",
+   "#201b2b",
+   "#ffffff18",
+   "#f3f3f6",
+   "#a4a6b4",
+   "#ba9cff",
+   "#14171c"
+  ]
+ },
+ "noite": {
+  "name": "Meia-noite",
+  "colors": [
+   "#0c1018",
+   "#171e2b",
+   "#ffffff18",
+   "#f3f3f6",
+   "#a4a6b4",
+   "#9abaff",
+   "#14171c"
+  ]
+ },
+ "roxo": {
+  "name": "Violeta",
+  "colors": [
+   "#100f19",
+   "#1d1a2c",
+   "#ffffff18",
+   "#f3f3f6",
+   "#a4a6b4",
+   "#ae8bfa",
+   "#14171c"
+  ]
+ },
+ "ciano": {
+  "name": "Ciano",
+  "colors": [
+   "#0b1418",
+   "#15252c",
+   "#ffffff18",
+   "#f3f3f6",
+   "#a4a6b4",
+   "#68daca",
+   "#14171c"
+  ]
+ },
+ "dourado": {
+  "name": "Champagne",
+  "colors": [
+   "#141311",
+   "#24221d",
+   "#ffffff18",
+   "#f3f3f6",
+   "#a4a6b4",
+   "#e7c785",
+   "#14171c"
+  ]
+ },
+ "azul": {
+  "name": "Azul oceano",
+  "colors": [
+   "#0b121c",
+   "#152234",
+   "#ffffff18",
+   "#f3f3f6",
+   "#a4a6b4",
+   "#7bb7ed",
+   "#14171c"
+  ]
+ },
+ "jade": {
+  "name": "Jade",
+  "colors": [
+   "#0e1512",
+   "#1a2821",
+   "#ffffff18",
+   "#f3f3f6",
+   "#a4a6b4",
+   "#8bcaaa",
+   "#14171c"
+  ]
+ },
+ "brasa": {
+  "name": "Terracota",
+  "colors": [
+   "#18120f",
+   "#2b211c",
+   "#ffffff18",
+   "#f3f3f6",
+   "#a4a6b4",
+   "#e9a17e",
+   "#14171c"
+  ]
+ },
+ "rubi": {
+  "name": "Rubi",
+  "colors": [
+   "#190f16",
+   "#2c1b26",
+   "#ffffff18",
+   "#f3f3f6",
+   "#a4a6b4",
+   "#e18eac",
+   "#14171c"
+  ]
+ },
+ "rosa": {
+  "name": "Rosé",
+  "colors": [
+   "#181219",
+   "#2a202c",
+   "#ffffff18",
+   "#f3f3f6",
+   "#a4a6b4",
+   "#e4aed6",
+   "#14171c"
+  ]
+ },
+ "circuito": {
+  "name": "Circuito",
+  "colors": [
+   "#0a1512",
+   "#142822",
+   "#ffffff18",
+   "#f3f3f6",
+   "#a4a6b4",
+   "#72d6ac",
+   "#14171c"
+  ],
+  "pattern": "repeating-linear-gradient(135deg,transparent 0 28px,#72d6ac0b 28px 29px),linear-gradient(#10211b,#0a1512)"
+ },
+ "aurora": {
+  "name": "Aurora",
+  "colors": [
+   "#101522",
+   "#20243b",
+   "#ffffff18",
+   "#f3f3f6",
+   "#a4a6b4",
+   "#9ebeea",
+   "#14171c"
+  ],
+  "pattern": "radial-gradient(ellipse at 10% 80%,#337b8544,transparent 70%),radial-gradient(ellipse at 90% 10%,#8169ab44,transparent 60%)"
+ },
+ "carbono": {
+  "name": "Carbono",
+  "colors": [
+   "#101214",
+   "#202427",
+   "#ffffff18",
+   "#f3f3f6",
+   "#a4a6b4",
+   "#d6e1df",
+   "#14171c"
+  ],
+  "pattern": "repeating-linear-gradient(45deg,#ffffff03 0 2px,transparent 2px 5px)"
+ },
+ "grafite": {
+  "name": "Titânio",
+  "colors": [
+   "#14171b",
+   "#24292f",
+   "#ffffff18",
+   "#f3f3f6",
+   "#a4a6b4",
+   "#b4bfcd",
+   "#14171c"
+  ]
+ }
 };
 function applyTheme(name){
  const theme=themes[name]||themes.ameixa;
@@ -52,3 +213,4 @@ function applyTheme(name){
  document.documentElement.dataset.theme=themes[name]?name:'ameixa';
 }
 applyTheme(read('fire-game-theme','ameixa'));
+
